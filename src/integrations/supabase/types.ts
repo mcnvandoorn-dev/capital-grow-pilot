@@ -259,6 +259,62 @@ export type Database = {
           },
         ]
       }
+      fundamental_data: {
+        Row: {
+          created_at: string
+          data_date: string
+          dividend_cagr_5y: number | null
+          dividend_yield: number | null
+          earnings_growth_3y: number | null
+          earnings_growth_5y: number | null
+          id: string
+          payout_ratio: number | null
+          pe_ratio: number | null
+          revenue_growth_3y: number | null
+          revenue_growth_5y: number | null
+          security_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_date: string
+          dividend_cagr_5y?: number | null
+          dividend_yield?: number | null
+          earnings_growth_3y?: number | null
+          earnings_growth_5y?: number | null
+          id?: string
+          payout_ratio?: number | null
+          pe_ratio?: number | null
+          revenue_growth_3y?: number | null
+          revenue_growth_5y?: number | null
+          security_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_date?: string
+          dividend_cagr_5y?: number | null
+          dividend_yield?: number | null
+          earnings_growth_3y?: number | null
+          earnings_growth_5y?: number | null
+          id?: string
+          payout_ratio?: number | null
+          pe_ratio?: number | null
+          revenue_growth_3y?: number | null
+          revenue_growth_5y?: number | null
+          security_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fundamental_data_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fx_rates: {
         Row: {
           created_at: string
