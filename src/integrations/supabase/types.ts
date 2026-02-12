@@ -190,6 +190,62 @@ export type Database = {
           },
         ]
       }
+      deep_dive_items: {
+        Row: {
+          content_markdown: string | null
+          created_at: string
+          error_message: string | null
+          file_path: string | null
+          id: string
+          security_id: string
+          source_type: string
+          status: string
+          summary: string | null
+          title: string
+          updated_at: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          content_markdown?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_path?: string | null
+          id?: string
+          security_id: string
+          source_type: string
+          status?: string
+          summary?: string | null
+          title: string
+          updated_at?: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          content_markdown?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_path?: string | null
+          id?: string
+          security_id?: string
+          source_type?: string
+          status?: string
+          summary?: string | null
+          title?: string
+          updated_at?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deep_dive_items_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dividend_history: {
         Row: {
           amount_per_share: number
