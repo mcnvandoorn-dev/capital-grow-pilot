@@ -12,6 +12,7 @@ import {
   ShoppingCart,
   FileBarChart,
 } from "lucide-react";
+import { DeepDiveTab } from "@/components/deepdive/DeepDiveTab";
 
 const StockDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -76,6 +77,7 @@ const StockDetail = () => {
           <TabsTrigger value="fundamentals">Fundamenteel</TabsTrigger>
           <TabsTrigger value="transactions">Transacties</TabsTrigger>
           <TabsTrigger value="dividends">Dividenden</TabsTrigger>
+          <TabsTrigger value="deepdive">Deep Dive</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -176,6 +178,16 @@ const StockDetail = () => {
               </p>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="deepdive">
+          {id ? (
+            <DeepDiveTab securityId={id} ticker={id} />
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              Geen security geselecteerd.
+            </p>
+          )}
         </TabsContent>
       </Tabs>
     </AppLayout>

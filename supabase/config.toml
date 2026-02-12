@@ -1,1 +1,7 @@
 project_id = "iuwhgrhcrzznmzgxbooz"
+
+[functions.deep-dive-scrape]
+verify_jwt = false
+
+[functions.deep-dive-analyze]
+verify_jwt = false
