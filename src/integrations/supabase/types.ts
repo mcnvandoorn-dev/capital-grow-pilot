@@ -515,6 +515,7 @@ export type Database = {
           dividend_frequency: string | null
           exchange: string | null
           id: string
+          industry: string | null
           is_active: boolean
           isin: string | null
           name: string | null
@@ -530,6 +531,7 @@ export type Database = {
           dividend_frequency?: string | null
           exchange?: string | null
           id?: string
+          industry?: string | null
           is_active?: boolean
           isin?: string | null
           name?: string | null
@@ -545,6 +547,7 @@ export type Database = {
           dividend_frequency?: string | null
           exchange?: string | null
           id?: string
+          industry?: string | null
           is_active?: boolean
           isin?: string | null
           name?: string | null
@@ -672,6 +675,38 @@ export type Database = {
           },
           {
             foreignKeyName: "transactions_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      watchlist: {
+        Row: {
+          added_at: string
+          id: string
+          notes: string | null
+          security_id: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          id?: string
+          notes?: string | null
+          security_id: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          id?: string
+          notes?: string | null
+          security_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watchlist_security_id_fkey"
             columns: ["security_id"]
             isOneToOne: false
             referencedRelation: "securities"
