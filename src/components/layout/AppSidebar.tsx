@@ -1,11 +1,12 @@
 import {
   LayoutDashboard,
   Eye,
-  FileBarChart,
   GitCompare,
   Settings,
   Bell,
+  LogOut,
 } from "lucide-react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
@@ -34,6 +35,7 @@ const secondaryNav = [
 
 export function AppSidebar() {
   const { state } = useSidebar();
+  const { user, signOut } = useAuth();
   const collapsed = state === "collapsed";
 
   return (
@@ -96,12 +98,29 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-4">
-        {!collapsed && (
-          <p className="text-xs text-sidebar-foreground/50">
-            © 2026 InvestView
-          </p>
-        )}
+      <SidebarFooter className="p-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-xs font-semibold uppercase">
+            {user?.email?.charAt(0) ?? "?"}
+          </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="truncate text-sm font-medium text-sidebar-foreground">
+                {user?.user_metadata?.display_name || user?.email || "Gebruiker"}
+              </p>
+              <p className="truncate text-xs text-sidebar-foreground/50">
+                {user?.email}
+              </p>
+            </div>
+          )}
+          <button
+            onClick={signOut}
+            className="shrink-0 rounded-md p-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            title="Uitloggen"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );
