@@ -10,6 +10,7 @@ import Watchlist from "./pages/Watchlist";
 import StockDetail from "./pages/StockDetail";
 import Strategies from "./pages/Strategies";
 import Auth from "./pages/Auth";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/watchlist" element={<ProtectedRoute><Watchlist /></ProtectedRoute>} />
             <Route path="/stock/:id" element={<ProtectedRoute><StockDetail /></ProtectedRoute>} />
             <Route path="/strategies" element={<ProtectedRoute><Strategies /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
