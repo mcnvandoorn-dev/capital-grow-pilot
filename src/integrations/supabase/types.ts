@@ -14,6 +14,101 @@ export type Database = {
   }
   public: {
     Tables: {
+      alert_notifications: {
+        Row: {
+          alert_id: string
+          id: string
+          is_read: boolean
+          triggered_at: string
+          triggered_value: number
+          user_id: string
+        }
+        Insert: {
+          alert_id: string
+          id?: string
+          is_read?: boolean
+          triggered_at?: string
+          triggered_value: number
+          user_id: string
+        }
+        Update: {
+          alert_id?: string
+          id?: string
+          is_read?: boolean
+          triggered_at?: string
+          triggered_value?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_notifications_alert_id_fkey"
+            columns: ["alert_id"]
+            isOneToOne: false
+            referencedRelation: "alerts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alerts: {
+        Row: {
+          alert_type: Database["public"]["Enums"]["alert_type"]
+          condition: Database["public"]["Enums"]["alert_condition"]
+          created_at: string
+          id: string
+          is_active: boolean
+          is_triggered: boolean
+          last_triggered_at: string | null
+          notes: string | null
+          portfolio_id: string | null
+          security_id: string
+          threshold: number
+          user_id: string
+        }
+        Insert: {
+          alert_type: Database["public"]["Enums"]["alert_type"]
+          condition: Database["public"]["Enums"]["alert_condition"]
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_triggered?: boolean
+          last_triggered_at?: string | null
+          notes?: string | null
+          portfolio_id?: string | null
+          security_id: string
+          threshold: number
+          user_id: string
+        }
+        Update: {
+          alert_type?: Database["public"]["Enums"]["alert_type"]
+          condition?: Database["public"]["Enums"]["alert_condition"]
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_triggered?: boolean
+          last_triggered_at?: string | null
+          notes?: string | null
+          portfolio_id?: string | null
+          security_id?: string
+          threshold?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alerts_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       capital_events: {
         Row: {
           buy_transaction_id: string | null
@@ -232,6 +327,50 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      market_data: {
+        Row: {
+          close_price: number | null
+          data_date: string
+          id: string
+          market_price: number | null
+          nav: number | null
+          rsi_14: number | null
+          security_id: string
+          updated_at: string
+          z_score: number | null
+        }
+        Insert: {
+          close_price?: number | null
+          data_date: string
+          id?: string
+          market_price?: number | null
+          nav?: number | null
+          rsi_14?: number | null
+          security_id: string
+          updated_at?: string
+          z_score?: number | null
+        }
+        Update: {
+          close_price?: number | null
+          data_date?: string
+          id?: string
+          market_price?: number | null
+          nav?: number | null
+          rsi_14?: number | null
+          security_id?: string
+          updated_at?: string
+          z_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_data_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       portfolios: {
         Row: {
@@ -548,6 +687,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      alert_condition: "ABOVE" | "BELOW" | "CROSSES_ABOVE" | "CROSSES_BELOW"
+      alert_type: "PRICE" | "DISCOUNT_TO_NAV" | "RSI" | "Z_SCORE"
       asset_class:
         | "CEF"
         | "BDC"
@@ -704,6 +845,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      alert_condition: ["ABOVE", "BELOW", "CROSSES_ABOVE", "CROSSES_BELOW"],
+      alert_type: ["PRICE", "DISCOUNT_TO_NAV", "RSI", "Z_SCORE"],
       asset_class: [
         "CEF",
         "BDC",
