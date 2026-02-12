@@ -562,6 +562,51 @@ export type Database = {
         }
         Relationships: []
       }
+      scoring_weights: {
+        Row: {
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+          w_52w_range: number
+          w_dividend_cagr: number
+          w_fundamental: number
+          w_payout_ratio: number
+          w_pe: number
+          w_revenue_growth: number
+          w_rsi: number
+          w_technical: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          w_52w_range?: number
+          w_dividend_cagr?: number
+          w_fundamental?: number
+          w_payout_ratio?: number
+          w_pe?: number
+          w_revenue_growth?: number
+          w_rsi?: number
+          w_technical?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          w_52w_range?: number
+          w_dividend_cagr?: number
+          w_fundamental?: number
+          w_payout_ratio?: number
+          w_pe?: number
+          w_revenue_growth?: number
+          w_rsi?: number
+          w_technical?: number
+        }
+        Relationships: []
+      }
       securities: {
         Row: {
           asset_class: Database["public"]["Enums"]["asset_class"]
@@ -612,6 +657,65 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      security_scores: {
+        Row: {
+          dividend_cagr_score: number | null
+          fundamental_score: number | null
+          id: string
+          inputs_json: Json | null
+          payout_score: number | null
+          pe_score: number | null
+          range_52w_score: number | null
+          revenue_growth_score: number | null
+          rsi_score: number | null
+          scored_at: string
+          security_id: string
+          technical_score: number | null
+          total_score: number | null
+          user_id: string
+        }
+        Insert: {
+          dividend_cagr_score?: number | null
+          fundamental_score?: number | null
+          id?: string
+          inputs_json?: Json | null
+          payout_score?: number | null
+          pe_score?: number | null
+          range_52w_score?: number | null
+          revenue_growth_score?: number | null
+          rsi_score?: number | null
+          scored_at?: string
+          security_id: string
+          technical_score?: number | null
+          total_score?: number | null
+          user_id: string
+        }
+        Update: {
+          dividend_cagr_score?: number | null
+          fundamental_score?: number | null
+          id?: string
+          inputs_json?: Json | null
+          payout_score?: number | null
+          pe_score?: number | null
+          range_52w_score?: number | null
+          revenue_growth_score?: number | null
+          rsi_score?: number | null
+          scored_at?: string
+          security_id?: string
+          technical_score?: number | null
+          total_score?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_scores_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sync_logs: {
         Row: {
@@ -775,7 +879,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      calculate_security_score: {
+        Args: { p_security_id: string; p_user_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       alert_condition: "ABOVE" | "BELOW" | "CROSSES_ABOVE" | "CROSSES_BELOW"
