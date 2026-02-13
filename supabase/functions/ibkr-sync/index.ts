@@ -575,11 +575,22 @@ function formatDate(d: string): string {
 }
 
 function mapAssetClass(
-  ibkrClass: string | undefined
+  ibkrClass: string | undefined,
+  description?: string | null
 ): "CEF" | "BDC" | "REIT" | "ETF" | "PREFERRED" | "BABY_BOND" | "OTHER" {
+  // First try description-based detection (more reliable than IBKR assetCategory)
+  if (description) {
+    const d = description.toUpperCase();
+    if (d.includes("REAL ESTATE") || d.includes("REIT")) return "REIT";
+    if (d.includes("BDC") || d.includes("BUSINESS DEVELOPMENT")) return "BDC";
+    if (d.includes("PREFERRED") || d.includes("PFD")) return "PREFERRED";
+    if (d.includes("BABY BOND")) return "BABY_BOND";
+    if (d.includes("SPLIT CORP") || d.includes("CLOSED-END") || d.includes("CLOSED END")) return "CEF";
+    if (d.includes("ETF") || d.includes("FUND") || d.includes("TRUST UNITS")) return "ETF";
+  }
+  // Fallback to IBKR asset category
   if (!ibkrClass) return "OTHER";
   const c = ibkrClass.toUpperCase();
-  if (c.includes("STK") || c.includes("STOCK")) return "OTHER";
   if (c.includes("ETF") || c.includes("FUND")) return "ETF";
   return "OTHER";
 }
