@@ -298,6 +298,9 @@ serve(async (req) => {
         recordsCreated++;
       }
 
+      // Step 5: Recalculate positions from transactions
+      await recalculatePositions(supabase, user.id);
+
       // Update sync log as success
       await supabase
         .from("sync_logs")
@@ -417,4 +420,79 @@ async function getOrCreatePortfolio(
     .single();
 
   return newPortfolio!.id;
+}
+
+async function recalculatePositions(supabase: any, userId: string) {
+  // Get all portfolios for user
+  const { data: portfolios } = await supabase
+    .from("portfolios")
+    .select("id, base_currency")
+    .eq("user_id", userId)
+    .eq("is_active", true);
+
+  if (!portfolios || portfolios.length === 0) return;
+
+  for (const portfolio of portfolios) {
+    // Get all transactions for this portfolio
+    const { data: txns } = await supabase
+      .from("transactions")
+      .select("security_id, transaction_type, quantity, price, currency, net_amount")
+      .eq("portfolio_id", portfolio.id)
+      .in("transaction_type", ["BUY", "SELL"])
+      .order("trade_date", { ascending: true });
+
+    if (!txns || txns.length === 0) continue;
+
+    // Aggregate per security
+    const posMap = new Map<string, { qty: number; totalCost: number; currency: string }>();
+
+    for (const tx of txns) {
+      const entry = posMap.get(tx.security_id) ?? { qty: 0, totalCost: 0, currency: tx.currency };
+
+      if (tx.transaction_type === "BUY") {
+        entry.totalCost += tx.quantity * tx.price;
+        entry.qty += tx.quantity;
+      } else {
+        // SELL: reduce position, proportional cost reduction
+        const avgCost = entry.qty > 0 ? entry.totalCost / entry.qty : 0;
+        entry.qty -= tx.quantity;
+        entry.totalCost = entry.qty > 0 ? avgCost * entry.qty : 0;
+      }
+
+      posMap.set(tx.security_id, entry);
+    }
+
+    // Upsert positions
+    for (const [securityId, pos] of posMap) {
+      const avgCost = pos.qty > 0 ? pos.totalCost / pos.qty : 0;
+
+      const { data: existing } = await supabase
+        .from("positions")
+        .select("id")
+        .eq("portfolio_id", portfolio.id)
+        .eq("security_id", securityId)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from("positions")
+          .update({
+            quantity: Math.max(0, pos.qty),
+            avg_cost_basis: Math.round(avgCost * 10000) / 10000,
+            total_cost_basis: Math.round(pos.totalCost * 100) / 100,
+            last_updated: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+      } else if (pos.qty > 0) {
+        await supabase.from("positions").insert({
+          portfolio_id: portfolio.id,
+          security_id: securityId,
+          quantity: pos.qty,
+          avg_cost_basis: Math.round(avgCost * 10000) / 10000,
+          total_cost_basis: Math.round(pos.totalCost * 100) / 100,
+          currency: pos.currency,
+        });
+      }
+    }
+  }
 }
