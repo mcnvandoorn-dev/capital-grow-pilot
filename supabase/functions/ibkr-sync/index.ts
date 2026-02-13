@@ -54,10 +54,9 @@ async function requestFlexReport(token: string, queryId: string): Promise<string
 async function fetchFlexStatement(
   token: string,
   refCode: string,
-  maxRetries = 15
-): Promise<string> {
+  maxRetries = 20
+): Promise<string | null> {
   for (let i = 0; i < maxRetries; i++) {
-    // Wait 5s between each attempt (total max ~75s)
     await new Promise((r) => setTimeout(r, 5000));
     const url = `${IBKR_GET_URL}?q=${refCode}&t=${token}&v=3`;
     console.log(`Attempt ${i + 1}/${maxRetries} to fetch IBKR report...`);
@@ -73,13 +72,13 @@ async function fetchFlexStatement(
       const errMsg = extractTag(xml, "ErrorMessage") || "Unknown";
       throw new Error(`IBKR GetStatement failed: ${errMsg}`);
     }
-    // Success or raw XML with data
     if (xml.includes("<FlexQueryResponse") || xml.includes("<FlexStatement")) {
       console.log("Report received successfully");
       return xml;
     }
   }
-  throw new Error("IBKR report not ready after max retries");
+  // Return null instead of throwing - caller handles retry
+  return null;
 }
 
 function parseNum(v: string | undefined): number {
@@ -111,7 +110,7 @@ serve(async (req) => {
     } = await anonClient.auth.getUser(authHeader.replace("Bearer ", ""));
     if (authError || !user) throw new Error("Unauthorized");
 
-    const { connectionId } = await req.json();
+    const { connectionId, refCode: existingRefCode } = await req.json();
     if (!connectionId) throw new Error("Missing connectionId");
 
     // Get IBKR connection
@@ -126,18 +125,6 @@ serve(async (req) => {
     if (!conn.flex_token || !conn.flex_query_id)
       throw new Error("Flex token or query ID not configured");
 
-    // Create sync log
-    const { data: syncLog } = await supabase
-      .from("sync_logs")
-      .insert({
-        user_id: user.id,
-        ibkr_connection_id: conn.id,
-        sync_source: "FLEX_QUERY",
-        status: "running",
-      })
-      .select()
-      .single();
-
     // Update connection status
     await supabase
       .from("ibkr_connections")
@@ -149,12 +136,46 @@ serve(async (req) => {
     let recordsUpdated = 0;
 
     try {
-      // Step 1: Request report
-      const refCode = await requestFlexReport(conn.flex_token, conn.flex_query_id);
+      // Step 1: Request report (or reuse existing refCode)
+      let refCode: string;
+      if (existingRefCode) {
+        console.log("Reusing existing refCode:", existingRefCode);
+        refCode = existingRefCode;
+      } else {
+        refCode = await requestFlexReport(conn.flex_token, conn.flex_query_id);
+        console.log("New refCode:", refCode);
+      }
 
-      // Step 2: Fetch report XML
+      // Step 2: Fetch report XML (returns null if not ready)
       const xml = await fetchFlexStatement(conn.flex_token, refCode);
+      
+      if (!xml) {
+        // Report not ready yet - return refCode so client can retry
+        console.log("Report not ready, returning refCode for retry");
+        await supabase
+          .from("ibkr_connections")
+          .update({ sync_status: "syncing" })
+          .eq("id", conn.id);
+        
+        return new Response(
+          JSON.stringify({ success: true, status: "pending", refCode }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       console.log("XML length:", xml.length);
+
+      // Create sync log now that we have data to process
+      const { data: syncLog } = await supabase
+        .from("sync_logs")
+        .insert({
+          user_id: user.id,
+          ibkr_connection_id: conn.id,
+          sync_source: "FLEX_QUERY",
+          status: "running",
+        })
+        .select()
+        .single();
 
       // Extract only the LAST FlexStatement (most recent date) for positions
       // The Flex Query returns 261+ daily statements; we only need the latest
