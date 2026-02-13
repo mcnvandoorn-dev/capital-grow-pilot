@@ -7,6 +7,7 @@ import { HoldingsTable } from "@/components/dashboard/HoldingsTable";
 import { AllocationChart } from "@/components/dashboard/AllocationChart";
 import { IbkrDailyWidget } from "@/components/dashboard/IbkrDailyWidget";
 import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
+import { CurrencyToggle } from "@/components/dashboard/CurrencyToggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DollarSign,
@@ -21,16 +22,44 @@ import {
   usePositions,
   useDividendsYTD,
 } from "@/hooks/usePortfolioData";
+import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
-function formatEur(value: number) {
+function formatAmount(value: number, currency: "EUR" | "USD") {
   return new Intl.NumberFormat("nl-NL", {
     style: "currency",
-    currency: "EUR",
+    currency,
     minimumFractionDigits: 2,
   }).format(value);
 }
 
+// Hook to get EUR→USD conversion rate
+function useEurToUsd() {
+  return useQuery({
+    queryKey: ["eur-to-usd-rate"],
+    queryFn: async () => {
+      // Get USD→EUR rate from fx_rates, invert it
+      const { data } = await supabase
+        .from("fx_rates")
+        .select("rate")
+        .eq("from_currency", "USD")
+        .eq("to_currency", "EUR")
+        .order("rate_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      // If USD→EUR rate exists, EUR→USD = 1/rate
+      return data?.rate ? 1 / data.rate : 1;
+    },
+  });
+}
+
 const Index = () => {
+  const { currency } = useDisplayCurrency();
+  const { data: eurToUsd } = useEurToUsd();
+  const rate = currency === "EUR" ? 1 : (eurToUsd ?? 1);
+  const fmt = (v: number) => formatAmount(v * rate, currency);
+
   const { data: portfolios, isLoading: loadingPortfolios } = usePortfolios();
   const portfolioIds = useMemo(
     () => (portfolios ?? []).map((p) => p.id),
@@ -68,7 +97,7 @@ const Index = () => {
   const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
 
   return (
-    <AppLayout title="Portfolio" subtitle="Overzicht van je beleggingen">
+    <AppLayout title="Portfolio" subtitle="Overzicht van je beleggingen" actions={<CurrencyToggle />}>
       {/* KPI row */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         {isLoading ? (
@@ -86,12 +115,12 @@ const Index = () => {
           <>
             <KpiCard
               label="Totale waarde"
-              value={formatEur(totalValue)}
+              value={fmt(totalValue)}
               icon={DollarSign}
             />
             <KpiCard
               label="Ongerealiseerd P/L"
-              value={formatEur(totalPnl)}
+              value={fmt(totalPnl)}
               change={`${totalPnlPct >= 0 ? "+" : ""}${totalPnlPct.toFixed(2)}%`}
               changeType={
                 totalPnl > 0
@@ -104,7 +133,7 @@ const Index = () => {
             />
             <KpiCard
               label="Dividend YTD"
-              value={formatEur(dividendsYTD ?? 0)}
+              value={fmt(dividendsYTD ?? 0)}
               icon={Wallet}
             />
             <KpiCard
