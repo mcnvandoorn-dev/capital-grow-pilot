@@ -117,45 +117,46 @@ Deno.serve(async (req) => {
     let netLiquidation = 0;
     let cashBalance = 0;
 
-    // EquitySummaryInBase
-    const equitySummaries = extractAllElements(xml, "EquitySummaryByReportDateInBase");
-    for (const el of equitySummaries) {
-      const nl = getAttr(el, "totalLong");
-      if (nl) netLiquidation = parseFloat(nl);
-    }
+    // Log what sections exist in the XML
+    const sectionTags = [...xml.matchAll(/<(\w+)[\s>\/]/g)].map(m => m[1]);
+    const uniqueTags = [...new Set(sectionTags)];
+    console.log(`XML tags found: ${uniqueTags.join(", ")}`);
 
-    // Also try EquitySummaryInBase
-    if (netLiquidation === 0) {
-      const eqSummaries = extractAllElements(xml, "EquitySummaryInBase");
-      for (const el of eqSummaries) {
-        const nl = getAttr(el, "totalLong");
-        if (nl) netLiquidation = parseFloat(nl);
+    // Try NAV in Base (user selected "Net Asset Value (NAV) in Base" with "Total")
+    for (const tagName of ["NAV", "NAVInBase", "EquitySummaryByReportDateInBase", "EquitySummaryInBase"]) {
+      if (netLiquidation !== 0) break;
+      const elements = extractAllElements(xml, tagName);
+      console.log(`Checking ${tagName}: found ${elements.length} elements`);
+      for (const el of elements) {
+        const total = getAttr(el, "total");
+        if (total) { netLiquidation = parseFloat(total); break; }
+        const totalLong = getAttr(el, "totalLong");
+        if (totalLong) { netLiquidation = parseFloat(totalLong); break; }
       }
     }
 
-    // CashReportCurrency (IBKR uses this tag name, not CashReport)
+    // CashReportCurrency - take the last element as base currency summary
+    // (when "Base Currency Summary" is selected, IBKR puts it as the last element)
     const cashReports = extractAllElements(xml, "CashReportCurrency");
     console.log(`Found ${cashReports.length} CashReportCurrency elements`);
+    
+    // First try to find BASE_SUMMARY by currency attribute
     for (const el of cashReports) {
       const currency = getAttr(el, "currency");
-      console.log(`CashReportCurrency currency=${currency}, has endingCash=${!!getAttr(el, "endingCash")}, endingSettledCash=${!!getAttr(el, "endingSettledCash")}`);
-      // Use BASE_SUMMARY for the overall cash position
       if (currency === "BASE_SUMMARY") {
         const cb = getAttr(el, "endingCash");
         if (cb) cashBalance = parseFloat(cb);
-        // Also try endingSettledCash
-        if (cashBalance === 0) {
-          const sc = getAttr(el, "endingSettledCash");
-          if (sc) cashBalance = parseFloat(sc);
-        }
-        console.log(`BASE_SUMMARY endingCash raw: ${getAttr(el, "endingCash")}`);
+        break;
       }
     }
     
-    // Log what sections exist in the XML
-    const sectionTags = [...xml.matchAll(/<(\w+)\s/g)].map(m => m[1]);
-    const uniqueTags = [...new Set(sectionTags)];
-    console.log(`XML tags found: ${uniqueTags.join(", ")}`);
+    // If no BASE_SUMMARY found, use the last element (base currency summary)
+    if (cashBalance === 0 && cashReports.length > 0) {
+      const lastEl = cashReports[cashReports.length - 1];
+      const cb = getAttr(lastEl, "endingCash");
+      if (cb) cashBalance = parseFloat(cb);
+      console.log(`Using last CashReportCurrency element, endingCash=${cb}`);
+    }
 
     // Fallback: try FlexStatement attributes
     if (netLiquidation === 0) {
