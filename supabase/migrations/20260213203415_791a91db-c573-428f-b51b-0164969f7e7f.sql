@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS fx_rates_from_to_date_unique ON public.fx_rates (from_currency, to_currency, rate_date);
