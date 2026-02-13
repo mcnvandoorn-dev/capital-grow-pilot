@@ -148,27 +148,10 @@ serve(async (req) => {
 
       // Step 2: Fetch report XML
       const xml = await fetchFlexStatement(conn.flex_token, refCode);
-
-      // DEBUG: Log XML structure to understand what IBKR returns
       console.log("XML length:", xml.length);
-      console.log("XML first 2000 chars:", xml.substring(0, 2000));
-      console.log("Contains <Trade:", xml.includes("<Trade"));
-      console.log("Contains <Order:", xml.includes("<Order"));
-      console.log("Contains <OpenPosition:", xml.includes("<OpenPosition"));
 
       // Step 3: Parse trades
       const trades = extractAttributes(xml, "Trade");
-      console.log("Parsed trades count:", trades.length);
-      if (trades.length > 0) {
-        console.log("Sample trade:", JSON.stringify(trades[0]));
-      }
-
-      // Also try OpenPosition for current holdings
-      const openPositions = extractAttributes(xml, "OpenPosition");
-      console.log("Parsed open positions count:", openPositions.length);
-      if (openPositions.length > 0) {
-        console.log("Sample open position:", JSON.stringify(openPositions[0]));
-      }
       for (const t of trades) {
         recordsProcessed++;
         if (!t.symbol || !t.tradeDate) continue;
@@ -316,8 +299,100 @@ serve(async (req) => {
         recordsCreated++;
       }
 
-      // Step 5: Recalculate positions from transactions
-      await recalculatePositions(supabase, user.id);
+      // Step 5: Import OpenPositions directly (if Flex Query includes them)
+      const openPositions = extractAttributes(xml, "OpenPosition");
+      console.log("Open positions found:", openPositions.length);
+
+      if (openPositions.length > 0) {
+        for (const op of openPositions) {
+          recordsProcessed++;
+          if (!op.symbol) continue;
+
+          // Upsert security
+          const { data: sec } = await supabase
+            .from("securities")
+            .upsert(
+              {
+                ticker: op.symbol,
+                name: op.description || null,
+                conid: op.conid || null,
+                exchange: op.listingExchange || op.exchange || null,
+                currency: (op.currency as any) || "USD",
+                asset_class: mapAssetClass(op.assetCategory),
+                isin: op.isin || null,
+              },
+              { onConflict: "ticker" }
+            )
+            .select("id")
+            .single();
+
+          if (!sec) continue;
+
+          const portfolioId = await getOrCreatePortfolio(
+            supabase,
+            user.id,
+            conn.id,
+            op.accountId || null,
+            (op.currency as any) || "USD"
+          );
+
+          const qty = parseNum(op.position || op.quantity);
+          const costBasis = parseNum(op.costBasisMoney);
+          const costPerShare = parseNum(op.costBasisPrice);
+          const markPrice = parseNum(op.markPrice);
+
+          if (qty <= 0) continue;
+
+          // Upsert position
+          const { data: existing } = await supabase
+            .from("positions")
+            .select("id")
+            .eq("portfolio_id", portfolioId)
+            .eq("security_id", sec.id)
+            .maybeSingle();
+
+          const posData = {
+            quantity: qty,
+            avg_cost_basis: costPerShare > 0 ? Math.round(costPerShare * 10000) / 10000 : (qty > 0 ? Math.round((costBasis / qty) * 10000) / 10000 : 0),
+            total_cost_basis: Math.round(costBasis * 100) / 100,
+            last_updated: new Date().toISOString(),
+          };
+
+          if (existing) {
+            await supabase.from("positions").update(posData).eq("id", existing.id);
+            recordsUpdated++;
+          } else {
+            await supabase.from("positions").insert({
+              portfolio_id: portfolioId,
+              security_id: sec.id,
+              currency: (op.currency as any) || "USD",
+              ...posData,
+            });
+            recordsCreated++;
+          }
+
+          // Also store market price if available
+          if (markPrice > 0) {
+            const today = new Date().toISOString().split("T")[0];
+            await supabase
+              .from("market_data")
+              .upsert(
+                {
+                  security_id: sec.id,
+                  data_date: today,
+                  close_price: markPrice,
+                  market_price: markPrice,
+                },
+                { onConflict: "security_id,data_date" }
+              );
+          }
+        }
+      }
+
+      // Step 6: If no open positions were found, recalculate from transactions
+      if (openPositions.length === 0) {
+        await recalculatePositions(supabase, user.id);
+      }
 
       // Update sync log as success
       await supabase
