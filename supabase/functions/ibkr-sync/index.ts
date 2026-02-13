@@ -199,7 +199,7 @@ serve(async (req) => {
               conid: t.conid || null,
               exchange: t.listingExchange || t.exchange || null,
               currency: (t.currency as any) || "USD",
-              asset_class: mapAssetClass(t.assetCategory),
+              asset_class: mapAssetClass(t.assetCategory, t.description),
               isin: t.isin || null,
             },
             { onConflict: "ticker,exchange" }
@@ -429,7 +429,7 @@ serve(async (req) => {
                 conid: agg.conid,
                 exchange: agg.exchange,
                 currency: agg.currency as any,
-                asset_class: mapAssetClass(agg.assetCategory),
+                asset_class: mapAssetClass(agg.assetCategory, agg.description),
                 isin: agg.isin,
               },
             { onConflict: "ticker,exchange" }

@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import { HoldingsTable } from "@/components/dashboard/HoldingsTable";
 import { AllocationChart } from "@/components/dashboard/AllocationChart";
 import { IbkrDailyWidget } from "@/components/dashboard/IbkrDailyWidget";
+import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DollarSign,
@@ -178,11 +179,7 @@ const Index = () => {
           <CardTitle className="text-base font-medium">Performance</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex h-48 items-center justify-center rounded-lg border border-dashed">
-            <p className="text-sm text-muted-foreground">
-              Rendementsgrafiek verschijnt bij voldoende data
-            </p>
-          </div>
+          <PerformanceChart />
         </CardContent>
       </Card>
     </AppLayout>
