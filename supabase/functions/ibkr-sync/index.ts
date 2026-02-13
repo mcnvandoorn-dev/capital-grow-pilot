@@ -149,8 +149,26 @@ serve(async (req) => {
       // Step 2: Fetch report XML
       const xml = await fetchFlexStatement(conn.flex_token, refCode);
 
+      // DEBUG: Log XML structure to understand what IBKR returns
+      console.log("XML length:", xml.length);
+      console.log("XML first 2000 chars:", xml.substring(0, 2000));
+      console.log("Contains <Trade:", xml.includes("<Trade"));
+      console.log("Contains <Order:", xml.includes("<Order"));
+      console.log("Contains <OpenPosition:", xml.includes("<OpenPosition"));
+
       // Step 3: Parse trades
       const trades = extractAttributes(xml, "Trade");
+      console.log("Parsed trades count:", trades.length);
+      if (trades.length > 0) {
+        console.log("Sample trade:", JSON.stringify(trades[0]));
+      }
+
+      // Also try OpenPosition for current holdings
+      const openPositions = extractAttributes(xml, "OpenPosition");
+      console.log("Parsed open positions count:", openPositions.length);
+      if (openPositions.length > 0) {
+        console.log("Sample open position:", JSON.stringify(openPositions[0]));
+      }
       for (const t of trades) {
         recordsProcessed++;
         if (!t.symbol || !t.tradeDate) continue;
