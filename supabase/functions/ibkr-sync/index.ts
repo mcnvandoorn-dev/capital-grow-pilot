@@ -54,22 +54,28 @@ async function requestFlexReport(token: string, queryId: string): Promise<string
 async function fetchFlexStatement(
   token: string,
   refCode: string,
-  maxRetries = 5
+  maxRetries = 15
 ): Promise<string> {
   for (let i = 0; i < maxRetries; i++) {
-    await new Promise((r) => setTimeout(r, 3000 * (i + 1)));
+    // Wait 5s between each attempt (total max ~75s)
+    await new Promise((r) => setTimeout(r, 5000));
     const url = `${IBKR_GET_URL}?q=${refCode}&t=${token}&v=3`;
+    console.log(`Attempt ${i + 1}/${maxRetries} to fetch IBKR report...`);
     const res = await fetch(url);
     const xml = await res.text();
 
     const status = extractTag(xml, "Status");
-    if (status === "Warn") continue; // not ready yet
+    if (status === "Warn") {
+      console.log("Report not ready yet, retrying...");
+      continue;
+    }
     if (status === "Fail") {
       const errMsg = extractTag(xml, "ErrorMessage") || "Unknown";
       throw new Error(`IBKR GetStatement failed: ${errMsg}`);
     }
     // Success or raw XML with data
     if (xml.includes("<FlexQueryResponse") || xml.includes("<FlexStatement")) {
+      console.log("Report received successfully");
       return xml;
     }
   }
