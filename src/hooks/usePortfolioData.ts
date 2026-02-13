@@ -83,23 +83,53 @@ export function usePositions(portfolioIds: string[]) {
         }
       }
 
-      // Enrich positions
+      // Fetch latest FX rates to EUR
+      const currencies = [...new Set(positions.map((p) => p.currency))].filter(
+        (c) => c !== "EUR"
+      );
+      const fxMap = new Map<string, number>();
+      fxMap.set("EUR", 1);
+
+      if (currencies.length > 0) {
+        const { data: fxRates } = await supabase
+          .from("fx_rates")
+          .select("from_currency, rate, rate_date")
+          .eq("to_currency", "EUR")
+          .in("from_currency", currencies)
+          .order("rate_date", { ascending: false });
+
+        if (fxRates) {
+          for (const fx of fxRates) {
+            if (!fxMap.has(fx.from_currency)) {
+              fxMap.set(fx.from_currency, fx.rate);
+            }
+          }
+        }
+      }
+
+      // Enrich positions with EUR-converted values
       const enriched: PositionWithDetails[] = positions.map((pos) => {
         const sec = pos.securities as any;
         const price = priceMap.get(pos.security_id) ?? null;
-        const marketValue = price !== null ? price * pos.quantity : null;
+        const fxRate = fxMap.get(pos.currency) ?? 1;
+
+        // market_value in local currency, then convert to EUR
+        const localMarketValue = price !== null ? price * pos.quantity : null;
+        const marketValue =
+          localMarketValue !== null ? localMarketValue * fxRate : null;
+        const costInEur = pos.total_cost_basis * fxRate;
         const unrealizedPnl =
-          marketValue !== null ? marketValue - pos.total_cost_basis : null;
+          marketValue !== null ? marketValue - costInEur : null;
         const unrealizedPnlPct =
-          unrealizedPnl !== null && pos.total_cost_basis > 0
-            ? (unrealizedPnl / pos.total_cost_basis) * 100
+          unrealizedPnl !== null && costInEur > 0
+            ? (unrealizedPnl / costInEur) * 100
             : null;
 
         return {
           id: pos.id,
           quantity: pos.quantity,
           avg_cost_basis: pos.avg_cost_basis,
-          total_cost_basis: pos.total_cost_basis,
+          total_cost_basis: costInEur,
           currency: pos.currency,
           portfolio_id: pos.portfolio_id,
           security_id: pos.security_id,
