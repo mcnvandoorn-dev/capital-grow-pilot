@@ -5,6 +5,9 @@ import {
   Settings,
   Bell,
   LogOut,
+  PieChart,
+  Search,
+  Scale,
 } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { NavLink } from "@/components/NavLink";
@@ -26,6 +29,12 @@ const mainNav = [
   { title: "Portfolio", url: "/", icon: LayoutDashboard },
   { title: "Watchlist", url: "/watchlist", icon: Eye },
   { title: "Strategieën", url: "/strategies", icon: GitCompare },
+];
+
+const analysisNav = [
+  { title: "Portfolio Breakdown", url: "/portfolio-breakdown", icon: PieChart },
+  { title: "Ticker Deep Dive", url: "/ticker-deep-dive", icon: Search },
+  { title: "Rebalancing Advisor", url: "/rebalancing-advisor", icon: Scale },
 ];
 
 const secondaryNav = [
@@ -64,6 +73,27 @@ export function AppSidebar() {
                     <NavLink
                       to={item.url}
                       end={item.url === "/"}
+                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Analyse</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {analysisNav.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild tooltip={item.title}>
+                    <NavLink
+                      to={item.url}
                       activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
                     >
                       <item.icon className="h-4 w-4" />
