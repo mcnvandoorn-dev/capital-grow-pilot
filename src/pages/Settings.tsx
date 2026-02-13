@@ -72,23 +72,39 @@ const SettingsPage = () => {
   });
 
   const syncMutation = useMutation({
-    mutationFn: async (connectionId: string) => {
+    mutationFn: async (params: { connectionId: string; refCode?: string }) => {
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ibkr-sync`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${session!.access_token}`,
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({ connectionId }),
+      
+      const callSync = async (refCode?: string): Promise<any> => {
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ibkr-sync`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${session!.access_token}`,
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({ connectionId: params.connectionId, refCode }),
+          }
+        );
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.error || "Sync failed");
+        
+        if (json.status === "pending" && json.refCode) {
+          // Report not ready yet, wait and retry with same refCode
+          toast({
+            title: "IBKR rapport wordt gegenereerd...",
+            description: "Even geduld, we proberen het opnieuw.",
+          });
+          await new Promise((r) => setTimeout(r, 15000));
+          return callSync(json.refCode);
         }
-      );
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || "Sync failed");
-      return json;
+        
+        return json;
+      };
+      
+      return callSync(params.refCode);
     },
     onSuccess: (data) => {
       toast({
@@ -261,7 +277,7 @@ const SettingsPage = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => syncMutation.mutate(conn.id)}
+                      onClick={() => syncMutation.mutate({ connectionId: conn.id })}
                       disabled={
                         syncMutation.isPending || conn.sync_status === "syncing"
                       }
