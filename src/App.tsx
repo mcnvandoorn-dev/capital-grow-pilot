@@ -12,6 +12,9 @@ import Strategies from "./pages/Strategies";
 import Auth from "./pages/Auth";
 import Settings from "./pages/Settings";
 import Alerts from "./pages/Alerts";
+import PortfolioBreakdown from "./pages/PortfolioBreakdown";
+import TickerDeepDive from "./pages/TickerDeepDive";
+import RebalancingAdvisor from "./pages/RebalancingAdvisor";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +34,9 @@ const App = () => (
             <Route path="/strategies" element={<ProtectedRoute><Strategies /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
+            <Route path="/portfolio-breakdown" element={<ProtectedRoute><PortfolioBreakdown /></ProtectedRoute>} />
+            <Route path="/ticker-deep-dive" element={<ProtectedRoute><TickerDeepDive /></ProtectedRoute>} />
+            <Route path="/rebalancing-advisor" element={<ProtectedRoute><RebalancingAdvisor /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
