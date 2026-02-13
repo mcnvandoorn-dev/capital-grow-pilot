@@ -190,6 +190,33 @@ export type Database = {
           },
         ]
       }
+      daily_account_summary: {
+        Row: {
+          cash_balance: number
+          created_at: string
+          date: string
+          id: string
+          net_liquidation: number
+          user_id: string
+        }
+        Insert: {
+          cash_balance: number
+          created_at?: string
+          date: string
+          id?: string
+          net_liquidation: number
+          user_id: string
+        }
+        Update: {
+          cash_balance?: number
+          created_at?: string
+          date?: string
+          id?: string
+          net_liquidation?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       deep_dive_items: {
         Row: {
           content_markdown: string | null
@@ -822,6 +849,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      trades: {
+        Row: {
+          created_at: string
+          id: string
+          price: number
+          quantity: number
+          realized_pnl: number | null
+          side: string
+          symbol: string
+          trade_date: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          price: number
+          quantity: number
+          realized_pnl?: number | null
+          side: string
+          symbol: string
+          trade_date: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          price?: number
+          quantity?: number
+          realized_pnl?: number | null
+          side?: string
+          symbol?: string
+          trade_date?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       transactions: {
         Row: {
