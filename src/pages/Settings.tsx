@@ -96,6 +96,8 @@ const SettingsPage = () => {
         description: `${data.records_created} nieuw, ${data.records_updated} bijgewerkt van ${data.records_processed} verwerkt.`,
       });
       queryClient.invalidateQueries({ queryKey: ["ibkr-connections"] });
+      queryClient.invalidateQueries({ queryKey: ["portfolios"] });
+      queryClient.invalidateQueries({ queryKey: ["positions"] });
     },
     onError: (error: any) => {
       toast({
