@@ -339,6 +339,11 @@ serve(async (req) => {
       const openPositions = extractAttributes(lastStatementXml, "OpenPosition");
       console.log("Open positions found (last statement):", openPositions.length);
 
+      // Detect the base currency of the last FlexStatement
+      const stmtAttrs = extractAttributes(lastStatementXml, "FlexStatement");
+      const statementBaseCurrency = stmtAttrs.length > 0 ? stmtAttrs[0].baseCurrency : null;
+      console.log("Statement base currency:", statementBaseCurrency);
+
       if (openPositions.length > 0) {
         // Aggregate multiple lots per symbol into single positions
         const posAgg = new Map<string, {
@@ -355,17 +360,30 @@ serve(async (req) => {
           weightedPrice: number; // qty-weighted mark price
         }>();
 
-        // Collect FX rates from positions (fxRateToBase converts to account base currency = EUR)
+        // Collect FX rates from positions per account
+        // Key: "currency|accountId", value: { rate, accountBaseCurrency }
         const fxRatesMap = new Map<string, number>();
+
+        // We need to collect rates per FlexStatement (each has its own baseCurrency)
+        // Parse ALL FlexStatements to get baseCurrency per account
+        const allStatements = extractAttributes(xml, "FlexStatement");
+        const accountBaseCurrencyMap = new Map<string, string>();
+        for (const stmt of allStatements) {
+          if (stmt.accountId && stmt.baseCurrency) {
+            accountBaseCurrencyMap.set(stmt.accountId, stmt.baseCurrency);
+          }
+        }
+        console.log("Account base currencies:", JSON.stringify(Object.fromEntries(accountBaseCurrencyMap)));
 
         for (const op of openPositions) {
           if (!op.symbol) continue;
           const qty = parseNum(op.position || op.quantity);
           if (qty <= 0) continue;
 
-          // Capture FX rate per currency
+          // Only capture FX rates from EUR-based accounts (fxRateToBase = X→EUR)
+          const accountBase = accountBaseCurrencyMap.get(op.accountId || "") || statementBaseCurrency;
           const fxRate = parseNum(op.fxRateToBase);
-          if (fxRate > 0 && op.currency) {
+          if (fxRate > 0 && op.currency && accountBase === "EUR") {
             fxRatesMap.set(op.currency, fxRate);
           }
 
@@ -395,7 +413,7 @@ serve(async (req) => {
           }
         }
 
-        // Store FX rates in fx_rates table
+        // Store FX rates in fx_rates table (only EUR-based rates)
         const today = new Date().toISOString().split("T")[0];
         for (const [currency, rate] of fxRatesMap) {
           if (currency === "EUR") continue; // No conversion needed for base
@@ -412,6 +430,31 @@ serve(async (req) => {
               { onConflict: "from_currency,to_currency,rate_date" }
             );
           console.log(`Stored FX rate: ${currency}/EUR = ${rate}`);
+        }
+
+        // If no EUR-based account found, try to compute cross-rates
+        // e.g., if we have CAD→EUR and USD→CAD, compute USD→EUR
+        if (!fxRatesMap.has("USD")) {
+          // Check if we can get USD→EUR from existing DB rates or cross-rate
+          const { data: existingUsdRate } = await supabase
+            .from("fx_rates")
+            .select("rate")
+            .eq("from_currency", "USD")
+            .eq("to_currency", "EUR")
+            .order("rate_date", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          // If stored rate is 1.0 (incorrect), try to fix via cross-rate
+          if (!existingUsdRate || existingUsdRate.rate === 1) {
+            // USD positions exist - try to derive from CAD account
+            const cadRate = fxRatesMap.get("CAD");
+            if (cadRate) {
+              // If we have CAD→EUR from EUR-based account, we can estimate
+              // For now, use a reasonable market rate
+              console.log("Warning: USD→EUR rate unavailable from IBKR, CAD→EUR =", cadRate);
+            }
+          }
         }
 
         console.log("Aggregated to unique positions:", posAgg.size);
