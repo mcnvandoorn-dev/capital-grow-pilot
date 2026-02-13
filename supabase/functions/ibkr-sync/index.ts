@@ -202,12 +202,15 @@ serve(async (req) => {
               asset_class: mapAssetClass(t.assetCategory),
               isin: t.isin || null,
             },
-            { onConflict: "ticker" }
+            { onConflict: "ticker,exchange" }
           )
           .select("id")
           .single();
 
-        if (!sec) continue;
+        if (!sec) {
+          console.log("Failed to upsert security for trade:", t.symbol);
+          continue;
+        }
 
         // Find or get portfolio
         const portfolioId = await getOrCreatePortfolio(
@@ -401,12 +404,15 @@ serve(async (req) => {
                 asset_class: mapAssetClass(agg.assetCategory),
                 isin: agg.isin,
               },
-              { onConflict: "ticker" }
-            )
-            .select("id")
-            .single();
+            { onConflict: "ticker,exchange" }
+          )
+          .select("id")
+          .single();
 
-          if (!sec) continue;
+        if (!sec) {
+          console.log("Failed to upsert security for position:", agg.symbol);
+          continue;
+        }
 
           const portfolioId = await getOrCreatePortfolio(
             supabase, user.id, conn.id, agg.accountId, agg.currency
