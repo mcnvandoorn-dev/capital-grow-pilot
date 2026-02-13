@@ -19,6 +19,7 @@ async function sendFlexRequest(token: string, queryId: string): Promise<string> 
   const url = `${FLEX_BASE}.SendRequest?t=${token}&q=${queryId}&v=3`;
   const res = await fetch(url);
   const text = await res.text();
+  console.log(`SendRequest raw response (first 500 chars): ${text.substring(0, 500)}`);
 
   // Extract reference code from XML
   const refMatch = text.match(/<ReferenceCode>(\d+)<\/ReferenceCode>/);
@@ -96,6 +97,9 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     console.log("Step 1: Requesting Flex statement...");
+    console.log(`Token length: ${token.length}, QueryID: ${queryId}`);
+    const sendUrl = `${FLEX_BASE}.SendRequest?t=${token}&q=${queryId}&v=3`;
+    console.log(`Request URL: ${sendUrl}`);
     const refCode = await sendFlexRequest(token, queryId);
     console.log(`Reference code: ${refCode}`);
 
@@ -103,6 +107,8 @@ Deno.serve(async (req) => {
     await sleep(5000); // Initial wait
     const xml = await getFlexStatement(token, refCode);
     console.log(`Statement received, length: ${xml.length}`);
+    // Log first 2000 chars to debug XML structure
+    console.log(`XML preview: ${xml.substring(0, 2000)}`);
 
     // Parse account summary (FlexStatement level attributes or EquitySummaryInBase)
     const today = new Date().toISOString().split("T")[0];
@@ -112,18 +118,44 @@ Deno.serve(async (req) => {
     let cashBalance = 0;
 
     // EquitySummaryInBase
-    const equitySummaries = extractAllElements(xml, "EquitySummaryInBase");
+    const equitySummaries = extractAllElements(xml, "EquitySummaryByReportDateInBase");
     for (const el of equitySummaries) {
       const nl = getAttr(el, "totalLong");
       if (nl) netLiquidation = parseFloat(nl);
     }
 
-    // CashReport
-    const cashReports = extractAllElements(xml, "CashReport");
-    for (const el of cashReports) {
-      const cb = getAttr(el, "endingCash");
-      if (cb) cashBalance = parseFloat(cb);
+    // Also try EquitySummaryInBase
+    if (netLiquidation === 0) {
+      const eqSummaries = extractAllElements(xml, "EquitySummaryInBase");
+      for (const el of eqSummaries) {
+        const nl = getAttr(el, "totalLong");
+        if (nl) netLiquidation = parseFloat(nl);
+      }
     }
+
+    // CashReportCurrency (IBKR uses this tag name, not CashReport)
+    const cashReports = extractAllElements(xml, "CashReportCurrency");
+    console.log(`Found ${cashReports.length} CashReportCurrency elements`);
+    for (const el of cashReports) {
+      const currency = getAttr(el, "currency");
+      console.log(`CashReportCurrency currency=${currency}, has endingCash=${!!getAttr(el, "endingCash")}, endingSettledCash=${!!getAttr(el, "endingSettledCash")}`);
+      // Use BASE_SUMMARY for the overall cash position
+      if (currency === "BASE_SUMMARY") {
+        const cb = getAttr(el, "endingCash");
+        if (cb) cashBalance = parseFloat(cb);
+        // Also try endingSettledCash
+        if (cashBalance === 0) {
+          const sc = getAttr(el, "endingSettledCash");
+          if (sc) cashBalance = parseFloat(sc);
+        }
+        console.log(`BASE_SUMMARY endingCash raw: ${getAttr(el, "endingCash")}`);
+      }
+    }
+    
+    // Log what sections exist in the XML
+    const sectionTags = [...xml.matchAll(/<(\w+)\s/g)].map(m => m[1]);
+    const uniqueTags = [...new Set(sectionTags)];
+    console.log(`XML tags found: ${uniqueTags.join(", ")}`);
 
     // Fallback: try FlexStatement attributes
     if (netLiquidation === 0) {
@@ -136,17 +168,29 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Upsert daily_account_summary (idempotent on date)
-    // We use a service role key, so we need to pass user context differently
-    // For cron jobs we'll store with a system user approach - get the first user with IBKR connection
-    const { data: users } = await supabase
+    console.log(`Parsed: NLV=${netLiquidation}, Cash=${cashBalance}`);
+
+    // Get user - try ibkr_connections first, then fall back to profiles table
+    let userId: string | null = null;
+    
+    const { data: connections } = await supabase
       .from("ibkr_connections")
       .select("user_id")
       .limit(1);
-
-    const userId = users?.[0]?.user_id;
+    
+    userId = connections?.[0]?.user_id ?? null;
+    
+    // Fallback: get first user from profiles
     if (!userId) {
-      throw new Error("No IBKR connection found - cannot determine user");
+      const { data: profileUsers } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .limit(1);
+      userId = profileUsers?.[0]?.user_id ?? null;
+    }
+
+    if (!userId) {
+      throw new Error("No user found - cannot determine user");
     }
 
     if (netLiquidation !== 0 || cashBalance !== 0) {
@@ -165,8 +209,12 @@ Deno.serve(async (req) => {
       else console.log(`Account summary saved: NLV=${netLiquidation}, Cash=${cashBalance}`);
     }
 
-    // Parse trades
-    const tradeElements = extractAllElements(xml, "Trade");
+    // Parse trades - try both "Trade" and "Order" tags
+    let tradeElements = extractAllElements(xml, "Trade");
+    if (tradeElements.length === 0) {
+      tradeElements = extractAllElements(xml, "Order");
+    }
+    console.log(`Found ${tradeElements.length} trade elements`);
     let tradesInserted = 0;
     let tradesSkipped = 0;
 
