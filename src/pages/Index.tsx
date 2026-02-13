@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { HoldingsTable } from "@/components/dashboard/HoldingsTable";
 import { AllocationChart } from "@/components/dashboard/AllocationChart";
+import { IbkrDailyWidget } from "@/components/dashboard/IbkrDailyWidget";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DollarSign,
@@ -164,6 +165,11 @@ const Index = () => {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* IBKR Daily Widget */}
+      <div className="mt-6">
+        <IbkrDailyWidget />
       </div>
 
       {/* Performance chart */}

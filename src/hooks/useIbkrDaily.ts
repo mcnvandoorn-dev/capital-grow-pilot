@@ -21,14 +21,11 @@ export function useIbkrDaily(date?: string) {
   return useQuery({
     queryKey: ["ibkr-daily", date],
     queryFn: async (): Promise<IbkrDailyData> => {
-      const params: Record<string, string> = {};
-      if (date) params.date = date;
-
-      const { data, error } = await supabase.functions.invoke("ibkr-daily", {
-        body: null,
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
+      const queryParams = date ? `?date=${date}` : "";
+      const { data, error } = await supabase.functions.invoke(
+        `ibkr-daily${queryParams}`,
+        { method: "GET" }
+      );
 
       if (error) throw error;
       return data as IbkrDailyData;
