@@ -10,7 +10,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Link, RefreshCw, Plus, Trash2 } from "lucide-react";
+import { Settings, Link, RefreshCw, Plus, Trash2, FolderOpen } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,30 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+const STRATEGY_LABELS: Record<string, string> = {
+  BUY_AND_HOLD: "Buy & Hold",
+  DIVIDEND_GROWTH: "Dividend Growth",
+  WORKING_CAPITAL_GROWTH: "Working Capital Growth",
+};
 
 const SettingsPage = () => {
   const { user } = useAuth();
@@ -30,6 +54,7 @@ const SettingsPage = () => {
   const [connectionName, setConnectionName] = useState("");
   const [flexToken, setFlexToken] = useState("");
   const [flexQueryId, setFlexQueryId] = useState("");
+  const [strategy, setStrategy] = useState<string>("BUY_AND_HOLD");
 
   const { data: connections, isLoading } = useQuery({
     queryKey: ["ibkr-connections", user?.id],
@@ -44,6 +69,19 @@ const SettingsPage = () => {
     enabled: !!user,
   });
 
+  const { data: portfolios, isLoading: loadingPortfolios } = useQuery({
+    queryKey: ["portfolios-settings", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("portfolios")
+        .select("id, name, strategy, is_active")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const createConnection = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("ibkr_connections").insert({
@@ -51,6 +89,7 @@ const SettingsPage = () => {
         connection_name: connectionName,
         flex_token: flexToken,
         flex_query_id: flexQueryId,
+        strategy: strategy as any,
       });
       if (error) throw error;
     },
@@ -61,20 +100,17 @@ const SettingsPage = () => {
       setConnectionName("");
       setFlexToken("");
       setFlexQueryId("");
+      setStrategy("BUY_AND_HOLD");
     },
     onError: (error: any) => {
-      toast({
-        variant: "destructive",
-        title: "Fout",
-        description: error.message,
-      });
+      toast({ variant: "destructive", title: "Fout", description: error.message });
     },
   });
 
   const syncMutation = useMutation({
     mutationFn: async (params: { connectionId: string; refCode?: string }) => {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       const callSync = async (refCode?: string): Promise<any> => {
         const res = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ibkr-sync`,
@@ -90,9 +126,8 @@ const SettingsPage = () => {
         );
         const json = await res.json();
         if (!res.ok || !json.success) throw new Error(json.error || "Sync failed");
-        
+
         if (json.status === "pending" && json.refCode) {
-          // Report not ready yet, wait and retry with same refCode
           toast({
             title: "IBKR rapport wordt gegenereerd...",
             description: "Even geduld, we proberen het opnieuw.",
@@ -100,10 +135,10 @@ const SettingsPage = () => {
           await new Promise((r) => setTimeout(r, 15000));
           return callSync(json.refCode);
         }
-        
+
         return json;
       };
-      
+
       return callSync(params.refCode);
     },
     onSuccess: (data) => {
@@ -116,26 +151,35 @@ const SettingsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["positions"] });
     },
     onError: (error: any) => {
-      toast({
-        variant: "destructive",
-        title: "Synchronisatie mislukt",
-        description: error.message,
-      });
+      toast({ variant: "destructive", title: "Synchronisatie mislukt", description: error.message });
       queryClient.invalidateQueries({ queryKey: ["ibkr-connections"] });
     },
   });
 
   const deleteConnection = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("ibkr_connections")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("ibkr_connections").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       toast({ title: "Verbinding verwijderd" });
       queryClient.invalidateQueries({ queryKey: ["ibkr-connections"] });
+    },
+  });
+
+  const deletePortfolio = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("portfolios").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Portfolio verwijderd" });
+      queryClient.invalidateQueries({ queryKey: ["portfolios"] });
+      queryClient.invalidateQueries({ queryKey: ["portfolios-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["positions"] });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Fout bij verwijderen", description: error.message });
     },
   });
 
@@ -151,16 +195,16 @@ const SettingsPage = () => {
   };
 
   return (
-    <AppLayout title="Instellingen" subtitle="Beheer je IBKR koppelingen">
-      <Card className="shadow-sm max-w-2xl">
+    <AppLayout title="Instellingen" subtitle="Beheer je koppelingen en portfolio's">
+      {/* IBKR Connections */}
+      <Card className="shadow-sm max-w-2xl mb-6">
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <div>
             <CardTitle className="text-base font-medium">
               Interactive Brokers koppelingen
             </CardTitle>
             <CardDescription>
-              Koppel je IBKR account via Flex Query om automatisch transacties en
-              dividenden te importeren.
+              Koppel je IBKR account via Flex Query en wijs een strategie toe.
             </CardDescription>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
@@ -174,8 +218,7 @@ const SettingsPage = () => {
               <DialogHeader>
                 <DialogTitle>Nieuwe IBKR koppeling</DialogTitle>
                 <DialogDescription>
-                  Maak een Flex Query aan in IBKR Account Management en vul de
-                  gegevens hieronder in.
+                  Maak een Flex Query aan in IBKR Account Management en vul de gegevens hieronder in.
                 </DialogDescription>
               </DialogHeader>
               <form
@@ -219,14 +262,21 @@ const SettingsPage = () => {
                     maxLength={20}
                   />
                 </div>
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={createConnection.isPending}
-                >
-                  {createConnection.isPending
-                    ? "Aanmaken..."
-                    : "Koppeling aanmaken"}
+                <div className="space-y-2">
+                  <Label htmlFor="strategy">Strategie</Label>
+                  <Select value={strategy} onValueChange={setStrategy}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Kies een strategie" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="BUY_AND_HOLD">Buy & Hold</SelectItem>
+                      <SelectItem value="DIVIDEND_GROWTH">Dividend Growth</SelectItem>
+                      <SelectItem value="WORKING_CAPITAL_GROWTH">Working Capital Growth</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="submit" className="w-full" disabled={createConnection.isPending}>
+                  {createConnection.isPending ? "Aanmaken..." : "Koppeling aanmaken"}
                 </Button>
               </form>
             </DialogContent>
@@ -234,9 +284,7 @@ const SettingsPage = () => {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              Laden...
-            </p>
+            <p className="text-sm text-muted-foreground py-4 text-center">Laden...</p>
           ) : !connections || connections.length === 0 ? (
             <EmptyState
               icon={Link}
@@ -246,29 +294,26 @@ const SettingsPage = () => {
           ) : (
             <div className="space-y-3">
               {connections.map((conn) => (
-                <div
-                  key={conn.id}
-                  className="flex items-center justify-between rounded-lg border p-4"
-                >
+                <div key={conn.id} className="flex items-center justify-between rounded-lg border p-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium">{conn.connection_name}</p>
                       {statusLabel(conn.sync_status)}
+                      <Badge variant="outline" className="text-xs">
+                        {STRATEGY_LABELS[(conn as any).strategy] ?? "Buy & Hold"}
+                      </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Query ID: {conn.flex_query_id || "—"}
                       {conn.last_sync_at && (
                         <>
                           {" · "}Laatst gesynchroniseerd:{" "}
-                          {new Date(conn.last_sync_at).toLocaleDateString(
-                            "nl-NL",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }
-                          )}
+                          {new Date(conn.last_sync_at).toLocaleDateString("nl-NL", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         </>
                       )}
                     </p>
@@ -278,25 +323,78 @@ const SettingsPage = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => syncMutation.mutate({ connectionId: conn.id })}
-                      disabled={
-                        syncMutation.isPending || conn.sync_status === "syncing"
-                      }
+                      disabled={syncMutation.isPending || conn.sync_status === "syncing"}
                     >
-                      <RefreshCw
-                        className={`mr-1.5 h-3.5 w-3.5 ${
-                          syncMutation.isPending ? "animate-spin" : ""
-                        }`}
-                      />
+                      <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${syncMutation.isPending ? "animate-spin" : ""}`} />
                       Synchroniseren
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteConnection.mutate(conn.id)}
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => deleteConnection.mutate(conn.id)}>
                       <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                     </Button>
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Portfolio management */}
+      <Card className="shadow-sm max-w-2xl">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-medium">Portfolio's</CardTitle>
+          <CardDescription>
+            Beheer je portfolio's. Let op: verwijderen verwijdert ook alle posities, transacties en dividenden.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingPortfolios ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">Laden...</p>
+          ) : !portfolios || portfolios.length === 0 ? (
+            <EmptyState
+              icon={FolderOpen}
+              title="Geen portfolio's"
+              description="Portfolio's worden automatisch aangemaakt bij het synchroniseren van een IBKR koppeling."
+            />
+          ) : (
+            <div className="space-y-3">
+              {portfolios.map((p) => (
+                <div key={p.id} className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">{p.name}</p>
+                      <Badge variant="outline" className="text-xs">
+                        {STRATEGY_LABELS[p.strategy] ?? p.strategy}
+                      </Badge>
+                      {!p.is_active && <Badge variant="secondary">Inactief</Badge>}
+                    </div>
+                  </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Portfolio verwijderen?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Weet je zeker dat je "{p.name}" wilt verwijderen? Dit verwijdert ook alle
+                          bijbehorende posities, transacties, dividenden en capital events. Dit kan
+                          niet ongedaan worden gemaakt.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deletePortfolio.mutate(p.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Verwijderen
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               ))}
             </div>

@@ -437,6 +437,7 @@ export type Database = {
           flex_token: string | null
           id: string
           last_sync_at: string | null
+          strategy: Database["public"]["Enums"]["investor_strategy"]
           sync_status: string | null
           updated_at: string
           user_id: string
@@ -449,6 +450,7 @@ export type Database = {
           flex_token?: string | null
           id?: string
           last_sync_at?: string | null
+          strategy?: Database["public"]["Enums"]["investor_strategy"]
           sync_status?: string | null
           updated_at?: string
           user_id: string
@@ -461,6 +463,7 @@ export type Database = {
           flex_token?: string | null
           id?: string
           last_sync_at?: string | null
+          strategy?: Database["public"]["Enums"]["investor_strategy"]
           sync_status?: string | null
           updated_at?: string
           user_id?: string
@@ -1025,7 +1028,10 @@ export type Database = {
         | "SEK"
         | "NOK"
         | "DKK"
-      investor_strategy: "BUY_AND_HOLD" | "WORKING_CAPITAL_GROWTH"
+      investor_strategy:
+        | "BUY_AND_HOLD"
+        | "WORKING_CAPITAL_GROWTH"
+        | "DIVIDEND_GROWTH"
       sync_source: "FLEX_QUERY" | "CLIENT_PORTAL" | "MANUAL"
       transaction_type:
         | "BUY"
@@ -1185,7 +1191,11 @@ export const Constants = {
         "NOK",
         "DKK",
       ],
-      investor_strategy: ["BUY_AND_HOLD", "WORKING_CAPITAL_GROWTH"],
+      investor_strategy: [
+        "BUY_AND_HOLD",
+        "WORKING_CAPITAL_GROWTH",
+        "DIVIDEND_GROWTH",
+      ],
       sync_source: ["FLEX_QUERY", "CLIENT_PORTAL", "MANUAL"],
       transaction_type: [
         "BUY",
