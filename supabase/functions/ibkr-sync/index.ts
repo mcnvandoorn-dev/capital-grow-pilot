@@ -355,10 +355,19 @@ serve(async (req) => {
           weightedPrice: number; // qty-weighted mark price
         }>();
 
+        // Collect FX rates from positions (fxRateToBase converts to account base currency = EUR)
+        const fxRatesMap = new Map<string, number>();
+
         for (const op of openPositions) {
           if (!op.symbol) continue;
           const qty = parseNum(op.position || op.quantity);
           if (qty <= 0) continue;
+
+          // Capture FX rate per currency
+          const fxRate = parseNum(op.fxRateToBase);
+          if (fxRate > 0 && op.currency) {
+            fxRatesMap.set(op.currency, fxRate);
+          }
 
           const key = `${op.symbol}|${op.accountId || ""}`;
           const existing = posAgg.get(key);
@@ -384,6 +393,25 @@ serve(async (req) => {
               weightedPrice: mark * qty,
             });
           }
+        }
+
+        // Store FX rates in fx_rates table
+        const today = new Date().toISOString().split("T")[0];
+        for (const [currency, rate] of fxRatesMap) {
+          if (currency === "EUR") continue; // No conversion needed for base
+          await supabase
+            .from("fx_rates")
+            .upsert(
+              {
+                from_currency: currency as any,
+                to_currency: "EUR" as any,
+                rate: Math.round(rate * 1000000) / 1000000,
+                rate_date: today,
+                source: "IBKR",
+              },
+              { onConflict: "from_currency,to_currency,rate_date" }
+            );
+          console.log(`Stored FX rate: ${currency}/EUR = ${rate}`);
         }
 
         console.log("Aggregated to unique positions:", posAgg.size);
