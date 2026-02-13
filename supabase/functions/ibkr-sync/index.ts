@@ -310,22 +310,69 @@ serve(async (req) => {
       console.log("Open positions found:", openPositions.length);
 
       if (openPositions.length > 0) {
-        for (const op of openPositions) {
-          recordsProcessed++;
-          if (!op.symbol) continue;
+        // Aggregate multiple lots per symbol into single positions
+        const posAgg = new Map<string, {
+          symbol: string;
+          description: string | null;
+          conid: string | null;
+          exchange: string | null;
+          currency: string;
+          assetCategory: string | undefined;
+          isin: string | null;
+          accountId: string | null;
+          totalQty: number;
+          totalCost: number;
+          weightedPrice: number; // qty-weighted mark price
+        }>();
 
+        for (const op of openPositions) {
+          if (!op.symbol) continue;
+          const qty = parseNum(op.position || op.quantity);
+          if (qty <= 0) continue;
+
+          const key = `${op.symbol}|${op.accountId || ""}`;
+          const existing = posAgg.get(key);
+          const cost = parseNum(op.costBasisMoney);
+          const mark = parseNum(op.markPrice);
+
+          if (existing) {
+            existing.totalQty += qty;
+            existing.totalCost += cost;
+            existing.weightedPrice += mark * qty;
+          } else {
+            posAgg.set(key, {
+              symbol: op.symbol,
+              description: op.description || null,
+              conid: op.conid || null,
+              exchange: op.listingExchange || op.exchange || null,
+              currency: op.currency || "USD",
+              assetCategory: op.assetCategory,
+              isin: op.isin || null,
+              accountId: op.accountId || null,
+              totalQty: qty,
+              totalCost: cost,
+              weightedPrice: mark * qty,
+            });
+          }
+        }
+
+        console.log("Aggregated to unique positions:", posAgg.size);
+        recordsProcessed += openPositions.length;
+
+        // Process aggregated positions
+        for (const [, agg] of posAgg) {
           // Upsert security
           const { data: sec } = await supabase
             .from("securities")
             .upsert(
               {
-                ticker: op.symbol,
-                name: op.description || null,
-                conid: op.conid || null,
-                exchange: op.listingExchange || op.exchange || null,
-                currency: (op.currency as any) || "USD",
-                asset_class: mapAssetClass(op.assetCategory),
-                isin: op.isin || null,
+                ticker: agg.symbol,
+                name: agg.description,
+                conid: agg.conid,
+                exchange: agg.exchange,
+                currency: agg.currency as any,
+                asset_class: mapAssetClass(agg.assetCategory),
+                isin: agg.isin,
               },
               { onConflict: "ticker" }
             )
@@ -335,22 +382,14 @@ serve(async (req) => {
           if (!sec) continue;
 
           const portfolioId = await getOrCreatePortfolio(
-            supabase,
-            user.id,
-            conn.id,
-            op.accountId || null,
-            (op.currency as any) || "USD"
+            supabase, user.id, conn.id, agg.accountId, agg.currency
           );
 
-          const qty = parseNum(op.position || op.quantity);
-          const costBasis = parseNum(op.costBasisMoney);
-          const costPerShare = parseNum(op.costBasisPrice);
-          const markPrice = parseNum(op.markPrice);
-
-          if (qty <= 0) continue;
+          const avgCost = agg.totalQty > 0 ? Math.round((agg.totalCost / agg.totalQty) * 10000) / 10000 : 0;
+          const markPrice = agg.totalQty > 0 ? agg.weightedPrice / agg.totalQty : 0;
 
           // Upsert position
-          const { data: existing } = await supabase
+          const { data: existingPos } = await supabase
             .from("positions")
             .select("id")
             .eq("portfolio_id", portfolioId)
@@ -358,26 +397,26 @@ serve(async (req) => {
             .maybeSingle();
 
           const posData = {
-            quantity: qty,
-            avg_cost_basis: costPerShare > 0 ? Math.round(costPerShare * 10000) / 10000 : (qty > 0 ? Math.round((costBasis / qty) * 10000) / 10000 : 0),
-            total_cost_basis: Math.round(costBasis * 100) / 100,
+            quantity: agg.totalQty,
+            avg_cost_basis: avgCost,
+            total_cost_basis: Math.round(agg.totalCost * 100) / 100,
             last_updated: new Date().toISOString(),
           };
 
-          if (existing) {
-            await supabase.from("positions").update(posData).eq("id", existing.id);
+          if (existingPos) {
+            await supabase.from("positions").update(posData).eq("id", existingPos.id);
             recordsUpdated++;
           } else {
             await supabase.from("positions").insert({
               portfolio_id: portfolioId,
               security_id: sec.id,
-              currency: (op.currency as any) || "USD",
+              currency: agg.currency as any,
               ...posData,
             });
             recordsCreated++;
           }
 
-          // Also store market price if available
+          // Store market price
           if (markPrice > 0) {
             const today = new Date().toISOString().split("T")[0];
             await supabase
@@ -386,8 +425,8 @@ serve(async (req) => {
                 {
                   security_id: sec.id,
                   data_date: today,
-                  close_price: markPrice,
-                  market_price: markPrice,
+                  close_price: Math.round(markPrice * 10000) / 10000,
+                  market_price: Math.round(markPrice * 10000) / 10000,
                 },
                 { onConflict: "security_id,data_date" }
               );
