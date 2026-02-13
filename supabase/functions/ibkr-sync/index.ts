@@ -156,7 +156,13 @@ serve(async (req) => {
       const xml = await fetchFlexStatement(conn.flex_token, refCode);
       console.log("XML length:", xml.length);
 
-      // Step 3: Parse trades
+      // Extract only the LAST FlexStatement (most recent date) for positions
+      // The Flex Query returns 261+ daily statements; we only need the latest
+      const lastStatementIdx = xml.lastIndexOf("<FlexStatement ");
+      const lastStatementXml = lastStatementIdx >= 0 ? xml.substring(lastStatementIdx) : xml;
+      console.log("Last statement XML length:", lastStatementXml.length);
+
+      // Step 3: Parse trades (from ALL statements - we want full history)
       const trades = extractAttributes(xml, "Trade");
       for (const t of trades) {
         recordsProcessed++;
@@ -305,9 +311,9 @@ serve(async (req) => {
         recordsCreated++;
       }
 
-      // Step 5: Import OpenPositions directly (if Flex Query includes them)
-      const openPositions = extractAttributes(xml, "OpenPosition");
-      console.log("Open positions found:", openPositions.length);
+      // Step 5: Import OpenPositions from LAST statement only (most recent date)
+      const openPositions = extractAttributes(lastStatementXml, "OpenPosition");
+      console.log("Open positions found (last statement):", openPositions.length);
 
       if (openPositions.length > 0) {
         // Aggregate multiple lots per symbol into single positions
