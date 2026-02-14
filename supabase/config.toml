@@ -17,3 +17,12 @@ verify_jwt = false
 
 [functions.fetch-fundamentals]
 verify_jwt = false
+
+[functions.portfolio-insights]
+verify_jwt = false
+
+[functions.rebalance-advisor]
+verify_jwt = false
+
+[functions.ticker-insights]
+verify_jwt = false
