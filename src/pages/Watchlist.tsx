@@ -112,23 +112,63 @@ const Watchlist = () => {
 
       try {
         const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data);
+        const workbook = XLSX.read(data, { type: "array" });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, {
-          header: 1,
-        }) as Record<string, unknown>[];
 
-        // Extract tickers: first column, skip header if it looks like text
+        // Try multiple parsing strategies
+        // Strategy 1: row-array mode
+        const rowArrays = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+          header: 1,
+          raw: false,
+          defval: "",
+        });
+
+        // Strategy 2: also try named-column mode to find "ticker"/"symbol" column
+        const namedRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+          raw: false,
+          defval: "",
+        });
+
         const tickers: string[] = [];
-        for (const row of rows) {
-          const val = (row as unknown as unknown[])?.[0];
-          if (typeof val === "string" && val.trim()) {
-            tickers.push(val.trim().toUpperCase());
+
+        // First try named columns
+        if (namedRows.length > 0) {
+          const keys = Object.keys(namedRows[0]);
+          const tickerKey = keys.find((k) =>
+            /^(ticker|symbol|code|isin)$/i.test(k.trim())
+          ) || keys[0]; // fall back to first column
+
+          for (const row of namedRows) {
+            const val = String(row[tickerKey] ?? "").trim().toUpperCase();
+            if (val && val !== "#VALUE!" && val.length <= 20) {
+              tickers.push(val);
+            }
+          }
+        }
+
+        // If named approach yielded nothing, try array approach
+        if (tickers.length === 0) {
+          for (const row of rowArrays) {
+            if (!Array.isArray(row) || row.length === 0) continue;
+            // Try each column to find ticker-like values
+            for (const cell of row) {
+              const val = String(cell ?? "").trim().toUpperCase();
+              if (
+                val &&
+                val !== "#VALUE!" &&
+                val.length >= 1 &&
+                val.length <= 20 &&
+                /^[A-Z0-9.\- ]+$/.test(val)
+              ) {
+                tickers.push(val);
+                break; // take first matching cell per row
+              }
+            }
           }
         }
 
         // Remove likely header rows
-        const headerPatterns = ["TICKER", "SYMBOL", "CODE", "NAAM", "NAME"];
+        const headerPatterns = ["TICKER", "SYMBOL", "CODE", "NAAM", "NAME", "ISIN", "SECURITY"];
         const cleanedTickers = tickers.filter(
           (t) => !headerPatterns.includes(t)
         );
