@@ -19,13 +19,12 @@ async function sendFlexRequest(token: string, queryId: string): Promise<string> 
   const url = `${FLEX_BASE}.SendRequest?t=${token}&q=${queryId}&v=3`;
   const res = await fetch(url);
   const text = await res.text();
-  console.log(`SendRequest raw response (first 500 chars): ${text.substring(0, 500)}`);
 
   // Extract reference code from XML
   const refMatch = text.match(/<ReferenceCode>(\d+)<\/ReferenceCode>/);
   if (!refMatch) {
     const errMatch = text.match(/<ErrorMessage>([^<]+)<\/ErrorMessage>/);
-    throw new Error(`Flex SendRequest failed: ${errMatch?.[1] ?? text.substring(0, 200)}`);
+    throw new Error(`Flex SendRequest failed: ${errMatch?.[1] ?? "Unknown error"}`);
   }
   return refMatch[1];
 }
@@ -97,18 +96,14 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     console.log("Step 1: Requesting Flex statement...");
-    console.log(`Token length: ${token.length}, QueryID: ${queryId}`);
-    const sendUrl = `${FLEX_BASE}.SendRequest?t=${token}&q=${queryId}&v=3`;
-    console.log(`Request URL: ${sendUrl}`);
+    console.log("Token present:", !!token, "QueryID present:", !!queryId);
     const refCode = await sendFlexRequest(token, queryId);
-    console.log(`Reference code: ${refCode}`);
+    console.log("Reference code received");
 
     console.log("Step 2: Fetching statement (with retries)...");
     await sleep(5000); // Initial wait
     const xml = await getFlexStatement(token, refCode);
-    console.log(`Statement received, length: ${xml.length}`);
-    // Log first 2000 chars to debug XML structure
-    console.log(`XML preview: ${xml.substring(0, 2000)}`);
+    console.log("Statement received, length:", xml.length);
 
     // Parse account summary (FlexStatement level attributes or EquitySummaryInBase)
     const today = new Date().toISOString().split("T")[0];
@@ -117,16 +112,10 @@ Deno.serve(async (req) => {
     let netLiquidation = 0;
     let cashBalance = 0;
 
-    // Log what sections exist in the XML
-    const sectionTags = [...xml.matchAll(/<(\w+)[\s>\/]/g)].map(m => m[1]);
-    const uniqueTags = [...new Set(sectionTags)];
-    console.log(`XML tags found: ${uniqueTags.join(", ")}`);
-
     // Try NAV in Base (user selected "Net Asset Value (NAV) in Base" with "Total")
     for (const tagName of ["NAV", "NAVInBase", "EquitySummaryByReportDateInBase", "EquitySummaryInBase"]) {
       if (netLiquidation !== 0) break;
       const elements = extractAllElements(xml, tagName);
-      console.log(`Checking ${tagName}: found ${elements.length} elements`);
       for (const el of elements) {
         const total = getAttr(el, "total");
         if (total) { netLiquidation = parseFloat(total); break; }
@@ -136,9 +125,7 @@ Deno.serve(async (req) => {
     }
 
     // CashReportCurrency - take the last element as base currency summary
-    // (when "Base Currency Summary" is selected, IBKR puts it as the last element)
     const cashReports = extractAllElements(xml, "CashReportCurrency");
-    console.log(`Found ${cashReports.length} CashReportCurrency elements`);
     
     // First try to find BASE_SUMMARY by currency attribute
     for (const el of cashReports) {
@@ -155,7 +142,6 @@ Deno.serve(async (req) => {
       const lastEl = cashReports[cashReports.length - 1];
       const cb = getAttr(lastEl, "endingCash");
       if (cb) cashBalance = parseFloat(cb);
-      console.log(`Using last CashReportCurrency element, endingCash=${cb}`);
     }
 
     // Fallback: try FlexStatement attributes
@@ -169,7 +155,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Parsed: NLV=${netLiquidation}, Cash=${cashBalance}`);
+    console.log("Parsed: NLV present:", netLiquidation !== 0, "Cash present:", cashBalance !== 0);
 
     // Get user - try ibkr_connections first, then fall back to profiles table
     let userId: string | null = null;
@@ -206,8 +192,8 @@ Deno.serve(async (req) => {
           },
           { onConflict: "user_id,date" }
         );
-      if (summaryErr) console.error("Summary upsert error:", summaryErr);
-      else console.log(`Account summary saved: NLV=${netLiquidation}, Cash=${cashBalance}`);
+      if (summaryErr) console.error("Summary upsert error:", summaryErr.message);
+      else console.log("Account summary saved successfully");
     }
 
     // Parse trades - try both "Trade" and "Order" tags
@@ -215,7 +201,7 @@ Deno.serve(async (req) => {
     if (tradeElements.length === 0) {
       tradeElements = extractAllElements(xml, "Order");
     }
-    console.log(`Found ${tradeElements.length} trade elements`);
+    console.log("Trade elements found:", tradeElements.length);
     let tradesInserted = 0;
     let tradesSkipped = 0;
 
@@ -250,7 +236,7 @@ Deno.serve(async (req) => {
         );
 
       if (tradeErr) {
-        console.error(`Trade insert error for ${symbol}:`, tradeErr);
+        console.error("Trade insert error:", tradeErr.message);
         tradesSkipped++;
       } else {
         tradesInserted++;
@@ -271,7 +257,7 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("IBKR daily sync error:", error);
+    console.error("IBKR daily sync error:", error instanceof Error ? error.message : "Unknown error");
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

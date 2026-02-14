@@ -24,10 +24,33 @@ Deno.serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
+    // Validate authentication
     const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const anonClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsErr } = await anonClient.auth.getClaims(token);
+    if (claimsErr || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Use service role for shared reference data writes
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceKey);
 
     const { securities } = (await req.json()) as { securities: SecurityInput[] };
     if (!securities?.length) {
@@ -122,7 +145,7 @@ Be precise. Use real data from 10-K filings, annual reports, and public disclosu
       if (!aiResponse.ok) {
         const status = aiResponse.status;
         if (status === 429) {
-          console.error("Rate limited, waiting before retry...");
+          console.warn("Rate limited, waiting before retry...");
           await new Promise((r) => setTimeout(r, 5000));
           i -= batchSize; // retry this batch
           continue;
@@ -130,8 +153,7 @@ Be precise. Use real data from 10-K filings, annual reports, and public disclosu
         if (status === 402) {
           throw new Error("AI credits exhausted");
         }
-        const errText = await aiResponse.text();
-        console.error(`AI error ${status}:`, errText);
+        console.error("AI request failed with status:", status);
         continue;
       }
 
@@ -145,7 +167,7 @@ Be precise. Use real data from 10-K filings, annual reports, and public disclosu
       try {
         results = JSON.parse(content);
       } catch (e) {
-        console.error("Failed to parse AI response:", content.slice(0, 500));
+        console.error("Failed to parse AI response");
         continue;
       }
 
@@ -227,7 +249,7 @@ Be precise. Use real data from 10-K filings, annual reports, and public disclosu
             .upsert(rows, { onConflict: "security_id,exposure_type,label" });
 
           if (insertError) {
-            console.error(`Insert error for ${sec.ticker}:`, insertError);
+            console.error("Insert error for ticker:", insertError.message);
           } else {
             totalUpdated++;
           }
@@ -240,7 +262,7 @@ Be precise. Use real data from 10-K filings, annual reports, and public disclosu
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Look-through error:", error);
+    console.error("Look-through error:", error instanceof Error ? error.message : "Unknown error");
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : "Unknown error",
