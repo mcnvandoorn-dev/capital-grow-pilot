@@ -695,6 +695,151 @@ export type Database = {
           },
         ]
       }
+      private_investment_cashflows: {
+        Row: {
+          amount: number
+          cashflow_date: string
+          cashflow_type: string
+          created_at: string
+          id: string
+          investment_id: string
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          cashflow_date: string
+          cashflow_type?: string
+          created_at?: string
+          id?: string
+          investment_id: string
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          cashflow_date?: string
+          cashflow_type?: string
+          created_at?: string
+          id?: string
+          investment_id?: string
+          notes?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "private_investment_cashflows_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "private_investments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      private_investment_valuations: {
+        Row: {
+          created_at: string
+          id: string
+          investment_id: string
+          notes: string | null
+          user_id: string
+          valuation_date: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          investment_id: string
+          notes?: string | null
+          user_id: string
+          valuation_date: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          investment_id?: string
+          notes?: string | null
+          user_id?: string
+          valuation_date?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "private_investment_valuations_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "private_investments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      private_investments: {
+        Row: {
+          annual_cashflow: number
+          asset_type: string
+          cashflow_frequency: string
+          created_at: string
+          currency: string
+          current_value: number | null
+          exit_horizon: string | null
+          expected_growth_pct: number | null
+          geography_label: string | null
+          id: string
+          invested_amount: number
+          is_active: boolean
+          name: string
+          notes: string | null
+          risk_bucket: string | null
+          sector_label: string | null
+          start_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          annual_cashflow?: number
+          asset_type: string
+          cashflow_frequency?: string
+          created_at?: string
+          currency?: string
+          current_value?: number | null
+          exit_horizon?: string | null
+          expected_growth_pct?: number | null
+          geography_label?: string | null
+          id?: string
+          invested_amount: number
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          risk_bucket?: string | null
+          sector_label?: string | null
+          start_date: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          annual_cashflow?: number
+          asset_type?: string
+          cashflow_frequency?: string
+          created_at?: string
+          currency?: string
+          current_value?: number | null
+          exit_horizon?: string | null
+          expected_growth_pct?: number | null
+          geography_label?: string | null
+          id?: string
+          invested_amount?: number
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          risk_bucket?: string | null
+          sector_label?: string | null
+          start_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           base_currency: Database["public"]["Enums"]["currency_code"]
