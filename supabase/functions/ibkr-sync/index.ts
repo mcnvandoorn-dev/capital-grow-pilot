@@ -139,13 +139,13 @@ serve(async (req) => {
       // Step 1: Request report (or reuse existing refCode)
       let refCode: string;
       if (existingRefCode) {
-        console.log("Reusing existing refCode:", existingRefCode);
+        console.log("Reusing existing refCode");
         refCode = existingRefCode;
       } else {
         const effectiveQueryId = queryIdOverride || conn.flex_query_id;
-        console.log("Using query ID:", effectiveQueryId, queryIdOverride ? "(override)" : "(default)");
+        console.log("Using query ID:", queryIdOverride ? "(override)" : "(default)");
         refCode = await requestFlexReport(conn.flex_token, effectiveQueryId);
-        console.log("New refCode:", refCode);
+        console.log("New refCode received");
       }
 
       // Step 2: Fetch report XML (returns null if not ready)
@@ -165,7 +165,7 @@ serve(async (req) => {
         );
       }
 
-      console.log("XML length:", xml.length);
+      console.log("Report received, length:", xml.length);
 
       // Create sync log now that we have data to process
       const { data: syncLog } = await supabase
@@ -342,12 +342,12 @@ serve(async (req) => {
 
       // Step 5: Import OpenPositions from LAST statement only (most recent date)
       const openPositions = extractAttributes(lastStatementXml, "OpenPosition");
-      console.log("Open positions found (last statement):", openPositions.length);
+      console.log("Open positions found:", openPositions.length);
 
       // Detect the base currency of the last FlexStatement
       const stmtAttrs = extractAttributes(lastStatementXml, "FlexStatement");
       const statementBaseCurrency = stmtAttrs.length > 0 ? stmtAttrs[0].baseCurrency : null;
-      console.log("Statement base currency:", statementBaseCurrency);
+      console.log("Base currency detected:", statementBaseCurrency ? "yes" : "no");
 
       if (openPositions.length > 0) {
         // Aggregate multiple lots per symbol into single positions
@@ -378,7 +378,7 @@ serve(async (req) => {
             accountBaseCurrencyMap.set(stmt.accountId, stmt.baseCurrency);
           }
         }
-        console.log("Account base currencies:", JSON.stringify(Object.fromEntries(accountBaseCurrencyMap)));
+        console.log("Account base currencies found:", accountBaseCurrencyMap.size);
 
         for (const op of openPositions) {
           if (!op.symbol) continue;
@@ -434,7 +434,7 @@ serve(async (req) => {
               },
               { onConflict: "from_currency,to_currency,rate_date" }
             );
-          console.log(`Stored FX rate: ${currency}/EUR = ${rate}`);
+          console.log(`Stored FX rate: ${currency}/EUR`);
         }
 
         // If no EUR-based account found, fetch real USD→EUR rate from external API
@@ -445,7 +445,7 @@ serve(async (req) => {
               const fxJson = await fxRes.json();
               const usdToEur = fxJson.rates?.EUR;
               if (usdToEur && typeof usdToEur === "number") {
-                console.log(`Fetched real USD→EUR rate: ${usdToEur}`);
+                console.log("Fetched real USD→EUR rate successfully");
                 await supabase.from("fx_rates").upsert(
                   {
                     from_currency: "USD" as any,
@@ -460,7 +460,7 @@ serve(async (req) => {
               }
             }
           } catch (fxErr) {
-            console.log("Warning: Could not fetch USD→EUR rate:", fxErr);
+            console.warn("Could not fetch USD→EUR rate");
           }
         }
 

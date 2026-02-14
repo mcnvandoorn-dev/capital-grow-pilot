@@ -93,7 +93,7 @@ Houd het beknopt (max 500 woorden). Gebruik bullet points. Wees specifiek.`;
         );
       }
       const text = await response.text();
-      console.error("AI gateway error:", response.status, text);
+      console.error("AI gateway error, status:", response.status);
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
