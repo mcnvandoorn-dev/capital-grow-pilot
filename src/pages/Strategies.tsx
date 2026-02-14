@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import { AllocationChart } from "@/components/dashboard/AllocationChart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, RefreshCw, Sprout, DollarSign, Wallet } from "lucide-react";
+import { TrendingUp, RefreshCw, Sprout, DollarSign, Wallet, Building2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -108,6 +108,7 @@ const Strategies = () => {
           <TabsTrigger value="buyhold">Buy & Hold</TabsTrigger>
           <TabsTrigger value="dividend">Dividend Growth</TabsTrigger>
           <TabsTrigger value="wcg">Working Capital Growth</TabsTrigger>
+          <TabsTrigger value="private">Private</TabsTrigger>
         </TabsList>
 
         <TabsContent value="buyhold">
@@ -119,7 +120,6 @@ const Strategies = () => {
             dividendsYTD={divBuyHold ?? 0}
             fmt={fmt}
             emptyDescription="Geen portfolio's met de Buy & Hold strategie."
-            privateInvestments={privateInvestments ?? []}
           />
         </TabsContent>
 
@@ -146,6 +146,14 @@ const Strategies = () => {
             emptyDescription="Geen portfolio's met de Working Capital Growth strategie."
           />
         </TabsContent>
+        <TabsContent value="private">
+          <PrivateInvestmentsSection
+            investments={privateInvestments ?? []}
+            fmt={fmt}
+            publicValue={allPositions?.reduce((s, p) => s + (p.market_value ?? p.total_cost_basis), 0) ?? 0}
+            publicIncome={(divBuyHold ?? 0) + (divDividend ?? 0) + (divWcg ?? 0)}
+          />
+        </TabsContent>
       </Tabs>
     </AppLayout>
   );
@@ -159,7 +167,6 @@ function StrategySection({
   dividendsYTD,
   fmt,
   emptyDescription,
-  privateInvestments,
 }: {
   icon: any;
   title: string;
@@ -168,7 +175,6 @@ function StrategySection({
   dividendsYTD: number;
   fmt: (v: number) => string;
   emptyDescription: string;
-  privateInvestments?: import("@/hooks/usePrivateInvestments").PrivateInvestment[];
 }) {
   // Aggregate all positions across portfolios in this strategy
   const allPositions = useMemo(() => {
@@ -323,15 +329,8 @@ function StrategySection({
         <DividendIntelligencePanel data={dividendIntel} fmt={fmt} />
       )}
 
-      {/* Private Investments */}
-      {privateInvestments && (
-        <PrivateInvestmentsSection
-          investments={privateInvestments}
-          fmt={fmt}
-          publicValue={totalValue}
-          publicIncome={dividendsYTD}
-        />
-      )}
+
+
     </div>
   );
 }
