@@ -6,107 +6,111 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-/** Fetch ticker info from multiple Yahoo Finance endpoints */
+// Known ticker → asset_class mappings for deterministic classification
+const KNOWN_BDC = new Set(["ARCC","BXSL","FDUS","HTGC","MAIN","OBDC","TPVG","TSLX","GBDC","GSBD","MSDL","NCDL","PSEC","OCSL","FSK","CSWC","SLRC","NMFC","PFLT","PNNT","BCSF","CGBD","ORCC","NEWT","SAR","TCPC","BBDC","BAIN","GLAD","GAIN","AINV","HRZN","TRIN","KCNQ"]);
+const KNOWN_CEF = new Set(["GOF","PCN","PDI","PTY","BME","OXLC","XFLT","MCI","MPV","ECC","RVT","ADX","RQI","RNP","JPC","JPS","JPI","HIX","HIE","UTF","USA","UTG","BTZ","BGB","AWF","ACP","BST","BIGZ","THQ","THW","EOS","EOI","ETG","ETW","ETY","ETB","JFR","JSD","DSL","FRA","FPF","DMO","NBB","NUV"]);
+const KNOWN_REIT = new Set(["O","STAG","NNN","WPC","VICI","MPW","AGNC","NLY","GOOD","LAND","HASI","UNIT"]);
+const KNOWN_ETF = new Set(["VTI","VOO","SPY","QQQ","SCHD","VYM","JEPI","JEPQ","DIVO","VIG","DGRO","HDV","PFF","HYG","LQD","TLT","BND","AGG","EMB","VWO","IEMG"]);
+
+const PREF_REGEX = /\s+PR[A-Z]?$/;
+const BABY_BOND_TICKERS = new Set(["OXLCG","NEWTG","ECCC","TRINL","KCNQ","OXLCL","HRZNG"]);
+
+function classifyTicker(ticker: string, aiAssetClass?: string): { asset_class: string } {
+  const t = ticker.toUpperCase();
+  if (KNOWN_BDC.has(t)) return { asset_class: "BDC" };
+  if (KNOWN_CEF.has(t)) return { asset_class: "CEF" };
+  if (KNOWN_REIT.has(t)) return { asset_class: "REIT" };
+  if (KNOWN_ETF.has(t)) return { asset_class: "ETF" };
+  if (BABY_BOND_TICKERS.has(t)) return { asset_class: "BABY_BOND" };
+  if (PREF_REGEX.test(t) || t.includes(" PR")) return { asset_class: "PREFERRED" };
+  
+  // Use AI classification if provided
+  if (aiAssetClass) {
+    const ac = aiAssetClass.toUpperCase();
+    if (["BDC","CEF","REIT","ETF","PREFERRED","BABY_BOND"].includes(ac)) {
+      return { asset_class: ac };
+    }
+  }
+  return { asset_class: "OTHER" };
+}
+
+/** Fetch ticker info using Lovable AI (combined name + classification) */
 async function fetchTickerInfo(ticker: string): Promise<{
   name: string | null;
+  asset_class: string | null;
   sector: string | null;
   industry: string | null;
 }> {
-  const empty = { name: null, sector: null, industry: null };
-  
-  // Try Yahoo Finance v8 quote endpoint
-  try {
-    const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=price,assetProfile`;
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json",
-      },
-    });
-    if (res.ok) {
-      const json = await res.json();
-      const result = json?.quoteSummary?.result?.[0];
-      const price = result?.price;
-      const profile = result?.assetProfile;
-      if (price?.longName || price?.shortName) {
-        console.log(`Yahoo v10 OK for ${ticker}: ${price.longName || price.shortName}`);
-        return {
-          name: price.longName || price.shortName || null,
-          sector: profile?.sector || null,
-          industry: profile?.industry || null,
-        };
-      }
-    } else {
-      await res.text();
-    }
-  } catch (e) {
-    console.log(`Yahoo v10 failed for ${ticker}:`, e);
-  }
+  const empty = { name: null, asset_class: null, sector: null, industry: null };
 
-  // Fallback: Yahoo v6 quote
-  try {
-    const url = `https://query1.finance.yahoo.com/v6/finance/quote?symbols=${encodeURIComponent(ticker)}`;
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json",
-      },
-    });
-    if (res.ok) {
-      const json = await res.json();
-      const quote = json?.quoteResponse?.result?.[0];
-      if (quote) {
-        console.log(`Yahoo v6 OK for ${ticker}: ${quote.longName || quote.shortName}`);
-        return {
-          name: quote.longName || quote.shortName || null,
-          sector: quote.sector || null,
-          industry: quote.industry || null,
-        };
-      }
-    } else {
-      await res.text();
-    }
-  } catch (e) {
-    console.log(`Yahoo v6 failed for ${ticker}:`, e);
-  }
-
-  // Fallback: use Lovable AI to look up ticker name
+  // Use Lovable AI to get name, type, and sector in one call
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
-  if (apiKey) {
-    try {
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash-lite",
-          messages: [
-            {
-              role: "user",
-              content: `What is the full company/fund name for the stock ticker "${ticker}"? Reply ONLY with the name, nothing else. If unknown, reply "UNKNOWN".`,
-            },
-          ],
-          max_tokens: 50,
-        }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        const answer = json?.choices?.[0]?.message?.content?.trim();
-        if (answer && answer !== "UNKNOWN" && answer.length < 100) {
-          console.log(`AI lookup OK for ${ticker}: ${answer}`);
-          return { name: answer, sector: null, industry: null };
-        }
-      } else {
-        await res.text();
-      }
-    } catch (e) {
-      console.log(`AI lookup failed for ${ticker}:`, e);
-    }
+  if (!apiKey) {
+    console.log(`No LOVABLE_API_KEY, skipping enrichment for ${ticker}`);
+    return empty;
   }
 
-  console.log(`No data found for ${ticker}`);
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [
+          {
+            role: "user",
+            content: `For the US-traded stock/fund ticker "${ticker}", provide this info as JSON only (no markdown):
+{"name":"<full official name>","asset_class":"<one of: BDC, CEF, REIT, ETF, PREFERRED, BABY_BOND, OTHER>","sector":"<sector like Financial Services, Fixed Income, Real Estate, Technology, Energy, Healthcare, Utilities, etc>","industry":"<specific industry>"}
+
+Rules:
+- BDC = Business Development Company (e.g. ARCC, BXSL, HTGC)
+- CEF = Closed-End Fund (e.g. GOF, PDI, PTY, OXLC)
+- REIT = Real Estate Investment Trust
+- ETF = Exchange Traded Fund
+- PREFERRED = Preferred stock
+- BABY_BOND = Exchange-traded debt/baby bond
+- OTHER = Common stock or anything else
+- If unknown ticker, set name to null
+Reply ONLY with the JSON object.`,
+          },
+        ],
+        max_tokens: 200,
+      }),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const answer = json?.choices?.[0]?.message?.content?.trim();
+      if (answer) {
+        // Parse JSON from AI response (strip markdown fences if present)
+        const cleaned = answer.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
+        try {
+          const parsed = JSON.parse(cleaned);
+          console.log(`AI enrichment OK for ${ticker}:`, JSON.stringify(parsed));
+          return {
+            name: parsed.name && parsed.name !== "null" ? parsed.name : null,
+            asset_class: parsed.asset_class || null,
+            sector: parsed.sector || null,
+            industry: parsed.industry || null,
+          };
+        } catch {
+          // If JSON parse fails, try to extract just the name
+          if (answer.length < 100 && !answer.includes("{")) {
+            return { name: answer, asset_class: null, sector: null, industry: null };
+          }
+        }
+      }
+    } else {
+      const errText = await res.text();
+      console.log(`AI enrichment failed for ${ticker}: ${res.status} ${errText}`);
+    }
+  } catch (e) {
+    console.log(`AI enrichment error for ${ticker}:`, e);
+  }
+
+  console.log(`No enrichment data found for ${ticker}`);
   return empty;
 }
 
@@ -161,7 +165,7 @@ Deno.serve(async (req) => {
       ...new Set(
         tickers
           .map((t: unknown) => String(t ?? "").trim().toUpperCase())
-          .filter((t: string) => t && /^[A-Z0-9][A-Z0-9.\-]{0,19}$/.test(t))
+          .filter((t: string) => t && /^[A-Z0-9][A-Z0-9.\- ]{0,19}$/.test(t))
       ),
     ];
 
@@ -181,73 +185,75 @@ Deno.serve(async (req) => {
     // Get existing securities
     const { data: existing, error: fetchErr } = await adminClient
       .from("securities")
-      .select("id, ticker, name")
+      .select("id, ticker, name, asset_class")
       .in("ticker", cleanedTickers);
     if (fetchErr) throw fetchErr;
 
     const existingMap = new Map(
-      (existing ?? []).map((s: any) => [s.ticker, { id: s.id, name: s.name }])
+      (existing ?? []).map((s: any) => [s.ticker, { id: s.id, name: s.name, asset_class: s.asset_class }])
     );
 
-    // Find tickers that are missing OR have no name
-    const missing = cleanedTickers.filter(
-      (t: string) => !existingMap.has(t)
-    );
-    const needsName = cleanedTickers.filter((t: string) => {
+    // Find tickers that need enrichment (missing, no name, or still OTHER)
+    const missing = cleanedTickers.filter((t: string) => !existingMap.has(t));
+    const needsEnrichment = cleanedTickers.filter((t: string) => {
       const e = existingMap.get(t);
-      return e && !e.name;
+      return e && (!e.name || e.asset_class === "OTHER");
     });
 
-    // Fetch info from Yahoo Finance for all tickers needing data
-    const tickersToEnrich = [...missing, ...needsName];
-    console.log(`Enriching ${tickersToEnrich.length} tickers via Yahoo Finance`);
+    const tickersToEnrich = [...missing, ...needsEnrichment];
+    console.log(`Enriching ${tickersToEnrich.length} tickers: ${tickersToEnrich.join(", ")}`);
 
-    const enrichedData = new Map<string, { name: string | null; sector: string | null; industry: string | null }>();
-    
+    const enrichedData = new Map<string, { name: string | null; asset_class: string | null; sector: string | null; industry: string | null }>();
+
     // Fetch in parallel with concurrency limit
     const batchSize = 5;
     for (let i = 0; i < tickersToEnrich.length; i += batchSize) {
       const batch = tickersToEnrich.slice(i, i + batchSize);
-      const results = await Promise.all(batch.map(t => fetchTickerInfo(t)));
+      const results = await Promise.all(batch.map((t) => fetchTickerInfo(t)));
       batch.forEach((t, idx) => enrichedData.set(t, results[idx]));
     }
 
     // Create missing securities with enriched data
     if (missing.length > 0) {
+      const rows = missing.map((ticker: string) => {
+        const info = enrichedData.get(ticker);
+        const classification = classifyTicker(ticker, info?.asset_class ?? undefined);
+        return {
+          ticker,
+          name: info?.name || null,
+          asset_class: classification.asset_class as any,
+          sector: info?.sector || null,
+          industry: info?.industry || null,
+        };
+      });
+
       const { data: created, error: createErr } = await adminClient
         .from("securities")
-        .insert(
-          missing.map((ticker: string) => {
-            const info = enrichedData.get(ticker);
-            return {
-              ticker,
-              name: info?.name || null,
-              sector: info?.sector || null,
-              industry: info?.industry || null,
-              asset_class: "OTHER" as const,
-            };
-          })
-        )
+        .insert(rows)
         .select("id, ticker");
       if (createErr) throw createErr;
-      created?.forEach((s: any) => existingMap.set(s.ticker, { id: s.id, name: null }));
+      created?.forEach((s: any) => existingMap.set(s.ticker, { id: s.id, name: null, asset_class: "OTHER" }));
     }
 
-    // Update existing securities that have no name
-    for (const ticker of needsName) {
+    // Update existing securities that need enrichment
+    for (const ticker of needsEnrichment) {
       const info = enrichedData.get(ticker);
-      if (info?.name) {
-        const entry = existingMap.get(ticker);
-        if (entry) {
-          await adminClient
-            .from("securities")
-            .update({
-              name: info.name,
-              sector: info.sector || undefined,
-              industry: info.industry || undefined,
-            })
-            .eq("id", entry.id);
-        }
+      const entry = existingMap.get(ticker);
+      if (!entry || !info) continue;
+
+      const classification = classifyTicker(ticker, info.asset_class ?? undefined);
+      const updates: Record<string, any> = {};
+
+      if (!entry.name && info.name) updates.name = info.name;
+      if (entry.asset_class === "OTHER" && classification.asset_class !== "OTHER") {
+        updates.asset_class = classification.asset_class;
+      }
+      if (info.sector) updates.sector = info.sector;
+      if (info.industry) updates.industry = info.industry;
+
+      if (Object.keys(updates).length > 0) {
+        console.log(`Updating ${ticker}:`, JSON.stringify(updates));
+        await adminClient.from("securities").update(updates).eq("id", entry.id);
       }
     }
 
