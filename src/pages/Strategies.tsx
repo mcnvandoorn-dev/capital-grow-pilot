@@ -15,6 +15,8 @@ import { CurrencyToggle } from "@/components/dashboard/CurrencyToggle";
 import { cn } from "@/lib/utils";
 import { useDividendIntelligence } from "@/hooks/useDividendIntelligence";
 import { DividendIntelligencePanel } from "@/components/strategies/DividendIntelligencePanel";
+import { usePrivateInvestments } from "@/hooks/usePrivateInvestments";
+import { PrivateInvestmentsSection } from "@/components/strategies/PrivateInvestmentsSection";
 
 function useEurToUsd() {
   return useQuery({
@@ -97,6 +99,7 @@ const Strategies = () => {
   const { data: divBuyHold } = useDividendsYTD(strategyPortfolioIds.BUY_AND_HOLD);
   const { data: divDividend } = useDividendsYTD(strategyPortfolioIds.DIVIDEND_GROWTH);
   const { data: divWcg } = useDividendsYTD(strategyPortfolioIds.WORKING_CAPITAL_GROWTH);
+  const { data: privateInvestments } = usePrivateInvestments();
 
   return (
     <AppLayout title="Strategieën" subtitle="Bekijk je portfolio's per strategie" actions={<CurrencyToggle />}>
@@ -116,6 +119,7 @@ const Strategies = () => {
             dividendsYTD={divBuyHold ?? 0}
             fmt={fmt}
             emptyDescription="Geen portfolio's met de Buy & Hold strategie."
+            privateInvestments={privateInvestments ?? []}
           />
         </TabsContent>
 
@@ -155,6 +159,7 @@ function StrategySection({
   dividendsYTD,
   fmt,
   emptyDescription,
+  privateInvestments,
 }: {
   icon: any;
   title: string;
@@ -163,6 +168,7 @@ function StrategySection({
   dividendsYTD: number;
   fmt: (v: number) => string;
   emptyDescription: string;
+  privateInvestments?: import("@/hooks/usePrivateInvestments").PrivateInvestment[];
 }) {
   // Aggregate all positions across portfolios in this strategy
   const allPositions = useMemo(() => {
@@ -315,6 +321,16 @@ function StrategySection({
       {/* Dividend Intelligence */}
       {dividendIntel && dividendIntel.securities.length > 0 && (
         <DividendIntelligencePanel data={dividendIntel} fmt={fmt} />
+      )}
+
+      {/* Private Investments */}
+      {privateInvestments && (
+        <PrivateInvestmentsSection
+          investments={privateInvestments}
+          fmt={fmt}
+          publicValue={totalValue}
+          publicIncome={dividendsYTD}
+        />
       )}
     </div>
   );
