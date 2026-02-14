@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -29,17 +30,18 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Eye, Plus, Search, Trash2, Upload, Bell } from "lucide-react";
+import { Eye, Plus, Search, Trash2, Upload, Bell, CheckCircle2, AlertTriangle, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useWatchlist,
   useAddToWatchlist,
-  useBulkAddToWatchlist,
+  useBulkImportWatchlist,
   useRemoveFromWatchlist,
+  lookupExistingTickers,
 } from "@/hooks/useWatchlist";
 import { useSecuritiesForSelect, useCreateAlert } from "@/hooks/useAlerts";
 import type { Database } from "@/integrations/supabase/types";
-import ExcelJS from "exceljs";
+import { generateImportPreview, getImportableTickers, type ImportResult } from "@/lib/importEngine";
 
 type AlertType = Database["public"]["Enums"]["alert_type"];
 type AlertCondition = Database["public"]["Enums"]["alert_condition"];
@@ -58,11 +60,18 @@ const CONDITION_LABELS: Record<AlertCondition, string> = {
   CROSSES_BELOW: "Kruist omlaag",
 };
 
+const STATUS_CONFIG = {
+  valid: { icon: CheckCircle2, label: "Geldig", className: "text-green-600 dark:text-green-400" },
+  unknown: { icon: AlertTriangle, label: "Nieuw", className: "text-amber-600 dark:text-amber-400" },
+  invalid: { icon: XCircle, label: "Ongeldig", className: "text-destructive" },
+  duplicate: { icon: XCircle, label: "Dubbel", className: "text-muted-foreground" },
+};
+
 const Watchlist = () => {
   const { data: watchlist, isLoading } = useWatchlist();
   const { data: securities } = useSecuritiesForSelect();
   const addToWatchlist = useAddToWatchlist();
-  const bulkAdd = useBulkAddToWatchlist();
+  const bulkImport = useBulkImportWatchlist();
   const removeFromWatchlist = useRemoveFromWatchlist();
   const createAlert = useCreateAlert();
 
@@ -78,6 +87,10 @@ const Watchlist = () => {
   const [alertSecurityId, setAlertSecurityId] = useState("");
   const [alertTicker, setAlertTicker] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Import preview state
+  const [importPreview, setImportPreview] = useState<ImportResult | null>(null);
+  const [parsing, setParsing] = useState(false);
 
   const filtered = watchlist?.filter((item) => {
     const q = search.toLowerCase();
@@ -105,122 +118,56 @@ const Watchlist = () => {
     }
   };
 
+  // Layer 4: Generate preview on file selection
   const handleFileUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
 
+      setParsing(true);
+      setImportPreview(null);
+
       try {
-        const data = await file.arrayBuffer();
-        const workbook = new ExcelJS.Workbook();
+        const preview = await generateImportPreview(file, lookupExistingTickers);
+        setImportPreview(preview);
 
-        if (file.name.endsWith(".csv")) {
-          const text = new TextDecoder().decode(data);
-          // For CSV, parse manually
-          const lines = text.split(/\r?\n/);
-          const csvSheet = workbook.addWorksheet("csv");
-          lines.forEach((line, i) => {
-            const cells = line.split(/[,;\t]/);
-            const row = csvSheet.getRow(i + 1);
-            cells.forEach((c, j) => row.getCell(j + 1).value = c.trim());
-          });
-        } else {
-          await workbook.xlsx.load(data);
+        if (preview.tickers.length === 0 && preview.errors.length > 0) {
+          toast.error(preview.errors[0]);
         }
-
-        const sheet = workbook.worksheets[0];
-        if (!sheet) {
-          toast.error("Geen werkblad gevonden in het bestand.");
-          return;
-        }
-
-        const tickers: string[] = [];
-        const headerPatterns = ["TICKER", "SYMBOL", "CODE", "NAAM", "NAME", "ISIN", "SECURITY"];
-
-        // Helper to extract a string value from any ExcelJS cell
-        const getCellString = (cell: any): string => {
-          if (!cell) return "";
-          // Try .result first (formula cells), then .value
-          let v = cell.result ?? cell.value;
-          // Handle rich text objects
-          if (v && typeof v === "object") {
-            if ("richText" in v && Array.isArray(v.richText)) {
-              return v.richText.map((rt: any) => rt.text ?? "").join("");
-            }
-            if ("error" in v) return ""; // Excel error object
-            if ("text" in v) return String(v.text ?? "");
-            // ExcelJS sometimes wraps values
-            if ("result" in v) return String(v.result ?? "");
-          }
-          return String(v ?? "");
-        };
-
-        // Detect ticker column from header row
-        let tickerColIndex = 1;
-        let hasHeaderRow = false;
-        const firstRow = sheet.getRow(1);
-        if (firstRow) {
-          firstRow.eachCell((cell, colNumber) => {
-            const val = getCellString(cell).trim().toUpperCase();
-            if (/^(TICKER|SYMBOL|CODE)$/.test(val)) {
-              tickerColIndex = colNumber;
-              hasHeaderRow = true;
-            }
-          });
-        }
-
-        sheet.eachRow((row, rowNumber) => {
-          // Skip header row only if we detected an actual header
-          if (hasHeaderRow && rowNumber === 1) return;
-
-          // Try the ticker column first
-          let val = getCellString(row.getCell(tickerColIndex)).trim().toUpperCase();
-
-          // If empty or error, scan all columns for a ticker-like value
-          if (!val || val.includes("#VALUE!") || val.includes("#REF!") || val.includes("#N/A")) {
-            for (let ci = 1; ci <= (row.cellCount || 10); ci++) {
-              const altVal = getCellString(row.getCell(ci)).trim().toUpperCase();
-              if (altVal && !altVal.includes("#") && altVal.length >= 1 && altVal.length <= 10 && /^[A-Z0-9.\-]+$/.test(altVal) && !headerPatterns.includes(altVal)) {
-                val = altVal;
-                break;
-              }
-            }
-          }
-
-          if (
-            val &&
-            !val.includes("#") &&
-            val.length >= 1 &&
-            val.length <= 20 &&
-            /^[A-Z0-9.\- ]+$/.test(val) &&
-            !headerPatterns.includes(val)
-          ) {
-            tickers.push(val);
-          }
-        });
-
-        const cleanedTickers = [...new Set(tickers)];
-
-        if (cleanedTickers.length === 0) {
-          toast.error(
-            "Geen tickers gevonden. Zorg dat tickers in de eerste kolom staan."
-          );
-          return;
-        }
-
-        const result = await bulkAdd.mutateAsync(cleanedTickers);
-        toast.success(
-          `${result.added} ticker(s) toegevoegd, ${result.skipped} overgeslagen`
+      } catch (err) {
+        toast.error(
+          `Onverwachte fout: ${err instanceof Error ? err.message : "onbekend"}`
         );
-        setUploadDialogOpen(false);
-      } catch {
-        toast.error("Fout bij het verwerken van het bestand.");
       } finally {
+        setParsing(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     },
-    [bulkAdd]
+    []
   );
+
+  // Layer 5: Confirmed import
+  const handleConfirmImport = async () => {
+    if (!importPreview) return;
+    const importable = getImportableTickers(importPreview);
+    if (importable.length === 0) {
+      toast.error("Geen importeerbare tickers gevonden.");
+      return;
+    }
+
+    try {
+      const result = await bulkImport.mutateAsync(importable);
+      toast.success(
+        `${result.added} ticker(s) toegevoegd, ${result.skipped} overgeslagen`
+      );
+      setImportPreview(null);
+      setUploadDialogOpen(false);
+    } catch (err) {
+      toast.error(
+        `Import mislukt: ${err instanceof Error ? err.message : "onbekend"}`
+      );
+    }
+  };
 
   const handleRemove = async (id: string) => {
     try {
@@ -265,6 +212,17 @@ const Watchlist = () => {
     }
   };
 
+  // Preview summary counts
+  const previewCounts = importPreview
+    ? {
+        valid: importPreview.tickers.filter((t) => t.status === "valid").length,
+        unknown: importPreview.tickers.filter((t) => t.status === "unknown").length,
+        invalid: importPreview.tickers.filter((t) => t.status === "invalid").length,
+        duplicate: importPreview.tickers.filter((t) => t.status === "duplicate").length,
+      }
+    : null;
+  const importableCount = previewCounts ? previewCounts.valid + previewCounts.unknown : 0;
+
   return (
     <AppLayout
       title="Watchlist"
@@ -274,7 +232,10 @@ const Watchlist = () => {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setUploadDialogOpen(true)}
+            onClick={() => {
+              setImportPreview(null);
+              setUploadDialogOpen(true);
+            }}
           >
             <Upload className="mr-1.5 h-3.5 w-3.5" />
             Excel upload
@@ -397,7 +358,10 @@ const Watchlist = () => {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setUploadDialogOpen(true)}
+                    onClick={() => {
+                      setImportPreview(null);
+                      setUploadDialogOpen(true);
+                    }}
                   >
                     <Upload className="mr-1.5 h-3.5 w-3.5" />
                     Excel upload
@@ -453,27 +417,143 @@ const Watchlist = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Excel upload dialog */}
-      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-        <DialogContent>
+      {/* Excel upload dialog with preview */}
+      <Dialog open={uploadDialogOpen} onOpenChange={(open) => {
+        setUploadDialogOpen(open);
+        if (!open) setImportPreview(null);
+      }}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Excel bestand uploaden</DialogTitle>
+            <DialogTitle>Excel/CSV importeren</DialogTitle>
             <DialogDescription>
-              Upload een Excel- of CSV-bestand met tickers in de eerste kolom.
-              Eventuele headerrij wordt automatisch overgeslagen.
+              Upload een .xlsx of .csv bestand met tickers. Headers worden
+              automatisch gedetecteerd. Je krijgt een preview vóór import.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+
+          {/* File input */}
+          <div className="py-2">
             <input
               ref={fileInputRef}
               type="file"
               accept=".xlsx,.xls,.csv"
               onChange={handleFileUpload}
-              className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
+              disabled={parsing}
+              className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer disabled:opacity-50"
             />
           </div>
-          {bulkAdd.isPending && (
-            <p className="text-sm text-muted-foreground">Bezig met verwerken...</p>
+
+          {/* Parsing indicator */}
+          {parsing && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Bestand wordt geanalyseerd...
+            </div>
+          )}
+
+          {/* Preview results */}
+          {importPreview && (
+            <div className="space-y-3">
+              {/* Summary */}
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="text-xs">
+                  {importPreview.totalRows} rij(en)
+                </Badge>
+                {previewCounts!.valid > 0 && (
+                  <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-xs">
+                    ✓ {previewCounts!.valid} geldig
+                  </Badge>
+                )}
+                {previewCounts!.unknown > 0 && (
+                  <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-xs">
+                    + {previewCounts!.unknown} nieuw
+                  </Badge>
+                )}
+                {previewCounts!.invalid > 0 && (
+                  <Badge variant="destructive" className="text-xs">
+                    ✗ {previewCounts!.invalid} ongeldig
+                  </Badge>
+                )}
+                {previewCounts!.duplicate > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    {previewCounts!.duplicate} dubbel
+                  </Badge>
+                )}
+              </div>
+
+              {/* Errors */}
+              {importPreview.errors.length > 0 && (
+                <div className="rounded-md bg-destructive/10 p-3 space-y-1">
+                  {importPreview.errors.map((err, i) => (
+                    <p key={i} className="text-xs text-destructive">{err}</p>
+                  ))}
+                </div>
+              )}
+
+              {/* Ticker table */}
+              {importPreview.tickers.length > 0 && (
+                <div className="max-h-64 overflow-y-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[120px]">Ticker</TableHead>
+                        <TableHead className="w-[80px]">Status</TableHead>
+                        <TableHead>Opmerking</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {importPreview.tickers.map((t, i) => {
+                        const cfg = STATUS_CONFIG[t.status];
+                        const Icon = cfg.icon;
+                        return (
+                          <TableRow key={i}>
+                            <TableCell className="font-mono text-sm font-medium">
+                              {t.cleaned}
+                            </TableCell>
+                            <TableCell>
+                              <div className={`flex items-center gap-1 text-xs ${cfg.className}`}>
+                                <Icon className="h-3.5 w-3.5" />
+                                {cfg.label}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {t.remark}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Actions */}
+          {importPreview && importableCount > 0 && (
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setImportPreview(null);
+                }}
+              >
+                Annuleren
+              </Button>
+              <Button
+                onClick={handleConfirmImport}
+                disabled={bulkImport.isPending}
+              >
+                {bulkImport.isPending ? (
+                  <>
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    Importeren...
+                  </>
+                ) : (
+                  `${importableCount} ticker(s) importeren`
+                )}
+              </Button>
+            </DialogFooter>
           )}
         </DialogContent>
       </Dialog>
@@ -487,65 +567,54 @@ const Watchlist = () => {
               <span className="font-mono">{alertTicker}</span>
             </DialogTitle>
             <DialogDescription>
-              Stel een automatisch alert in om meldingen te ontvangen.
+              Stel een alert in om een melding te ontvangen wanneer een bepaalde waarde wordt bereikt.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <Select
-                  value={alertType}
-                  onValueChange={(v) => setAlertType(v as AlertType)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(
-                      Object.entries(ALERT_TYPE_LABELS) as [AlertType, string][]
-                    ).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Conditie</Label>
-                <Select
-                  value={alertCondition}
-                  onValueChange={(v) =>
-                    setAlertCondition(v as AlertCondition)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(
-                      Object.entries(CONDITION_LABELS) as [
-                        AlertCondition,
-                        string,
-                      ][]
-                    ).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select
+                value={alertType}
+                onValueChange={(v) => setAlertType(v as AlertType)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(ALERT_TYPE_LABELS).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Conditie</Label>
+              <Select
+                value={alertCondition}
+                onValueChange={(v) => setAlertCondition(v as AlertCondition)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CONDITION_LABELS).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Drempelwaarde</Label>
               <Input
                 type="number"
                 step="any"
-                placeholder="Bijv. 25.50"
                 value={alertThreshold}
                 onChange={(e) => setAlertThreshold(e.target.value)}
+                placeholder="Bijv. 25.50"
               />
             </div>
           </div>
