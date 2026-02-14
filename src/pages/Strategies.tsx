@@ -13,6 +13,8 @@ import { usePositions, useDividendsYTD } from "@/hooks/usePortfolioData";
 import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
 import { CurrencyToggle } from "@/components/dashboard/CurrencyToggle";
 import { cn } from "@/lib/utils";
+import { useDividendIntelligence } from "@/hooks/useDividendIntelligence";
+import { DividendIntelligencePanel } from "@/components/strategies/DividendIntelligencePanel";
 
 function useEurToUsd() {
   return useQuery({
@@ -172,6 +174,10 @@ function StrategySection({
     return result;
   }, [portfolios, positionsByPortfolio]);
 
+  // Dividend Intelligence
+  const portfolioIds = useMemo(() => portfolios.map((p) => p.id), [portfolios]);
+  const { data: dividendIntel } = useDividendIntelligence(portfolioIds, allPositions);
+
   const totalValue = useMemo(
     () => allPositions.reduce((sum, p) => sum + (p.market_value ?? p.total_cost_basis), 0),
     [allPositions]
@@ -305,6 +311,10 @@ function StrategySection({
             );
           })}
         </div>
+      )}
+      {/* Dividend Intelligence */}
+      {dividendIntel && dividendIntel.securities.length > 0 && (
+        <DividendIntelligencePanel data={dividendIntel} fmt={fmt} />
       )}
     </div>
   );
