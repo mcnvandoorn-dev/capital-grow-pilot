@@ -298,54 +298,85 @@ const Watchlist = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[100px]">Ticker</TableHead>
+                  <TableHead className="w-[90px]">Ticker</TableHead>
                   <TableHead>Naam</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Sector</TableHead>
+                  <TableHead className="text-right">Prijs</TableHead>
+                  <TableHead className="text-right">NAV</TableHead>
+                  <TableHead className="text-right">Z-Score</TableHead>
+                  <TableHead className="text-right">RSI</TableHead>
+                  <TableHead className="text-right">52w H/L</TableHead>
                   <TableHead className="text-center">Alert</TableHead>
                   <TableHead className="w-[40px]" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium font-mono text-sm">
-                      {item.securities?.ticker ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      {item.securities?.name ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {item.securities?.asset_class ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {item.securities?.sector ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <button
-                        onClick={() =>
-                          openAlertDialog(
-                            item.securities?.id ?? "",
-                            item.securities?.ticker ?? ""
-                          )
-                        }
-                        className="rounded-md p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
-                        title="Alert instellen"
-                      >
-                        <Bell className="h-4 w-4" />
-                      </button>
-                    </TableCell>
-                    <TableCell>
-                      <button
-                        onClick={() => handleRemove(item.id)}
-                        className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                        title="Verwijderen"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filtered.map((item) => {
+                  const md = item.marketData;
+                  const price = md?.market_price ?? md?.close_price;
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium font-mono text-sm">
+                        {item.securities?.ticker ?? "—"}
+                      </TableCell>
+                      <TableCell className="max-w-[180px] truncate">
+                        {item.securities?.name ?? (
+                          <span className="text-muted-foreground italic">onbekend</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {item.securities?.asset_class ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {price != null ? `$${price.toFixed(2)}` : "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {md?.nav != null ? `$${md.nav.toFixed(2)}` : "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {md?.z_score != null ? md.z_score.toFixed(2) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {md?.rsi_14 != null ? (
+                          <span className={
+                            md.rsi_14 < 30 ? "text-green-600 dark:text-green-400" :
+                            md.rsi_14 > 70 ? "text-red-600 dark:text-red-400" : ""
+                          }>
+                            {md.rsi_14.toFixed(1)}
+                          </span>
+                        ) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs">
+                        {md?.high_52w != null && md?.low_52w != null
+                          ? `${md.high_52w.toFixed(2)} / ${md.low_52w.toFixed(2)}`
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <button
+                          onClick={() =>
+                            openAlertDialog(
+                              item.securities?.id ?? "",
+                              item.securities?.ticker ?? ""
+                            )
+                          }
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                          title="Alert instellen"
+                        >
+                          <Bell className="h-4 w-4" />
+                        </button>
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          onClick={() => handleRemove(item.id)}
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                          title="Verwijderen"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           ) : (
