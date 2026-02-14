@@ -90,13 +90,6 @@ export function useDividendIntelligence(
         divBySec.set(d.security_id, arr);
       }
 
-      // Find data span for H1/H2 trend fallback
-      const allDates = dividends.map(d => new Date(d.ex_date).getTime());
-      const minDate = Math.min(...allDates);
-      const maxDate = Math.max(...allDates);
-      const midDate = new Date((minDate + maxDate) / 2);
-      const dataSpanDays = (maxDate - minDate) / (1000 * 60 * 60 * 24);
-
       let totalAnnualIncome = 0;
       let totalMarketValue = 0;
       const secMetrics: SecurityDividendMetrics[] = [];
@@ -115,7 +108,7 @@ export function useDividendIntelligence(
           0
         );
 
-        // Try YoY first (needs 2 years of data)
+        // YoY growth (needs 2 years of data - no fallback to avoid misleading metrics)
         const prev12m = divs.filter((d) => {
           const dt = new Date(d.ex_date);
           return dt >= twoYearsAgo && dt < oneYearAgo;
@@ -128,21 +121,6 @@ export function useDividendIntelligence(
         let growthPct: number | null = null;
         if (prevDiv > 10) {
           growthPct = ((annualDiv - prevDiv) / prevDiv) * 100;
-        } else if (dataSpanDays >= 120) {
-          // Fallback: H1 vs H2 annualized trend
-          const h1 = divs
-            .filter((d) => new Date(d.ex_date).getTime() < midDate.getTime())
-            .reduce((s, d) => s + d.net_amount * d.fx_rate_to_base, 0);
-          const h2 = divs
-            .filter((d) => new Date(d.ex_date).getTime() >= midDate.getTime())
-            .reduce((s, d) => s + d.net_amount * d.fx_rate_to_base, 0);
-          const h1Days = (midDate.getTime() - minDate) / (1000 * 60 * 60 * 24);
-          const h2Days = (maxDate - midDate.getTime()) / (1000 * 60 * 60 * 24);
-          if (h1Days >= 60 && h2Days >= 60 && h1 > 5) {
-            const h1Annual = (h1 / h1Days) * 365;
-            const h2Annual = (h2 / h2Days) * 365;
-            growthPct = ((h2Annual - h1Annual) / h1Annual) * 100;
-          }
         }
         if (growthPct !== null) growthRates.push(growthPct);
 
