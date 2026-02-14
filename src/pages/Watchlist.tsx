@@ -39,7 +39,7 @@ import {
 } from "@/hooks/useWatchlist";
 import { useSecuritiesForSelect, useCreateAlert } from "@/hooks/useAlerts";
 import type { Database } from "@/integrations/supabase/types";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 type AlertType = Database["public"]["Enums"]["alert_type"];
 type AlertCondition = Database["public"]["Enums"]["alert_condition"];
@@ -112,66 +112,61 @@ const Watchlist = () => {
 
       try {
         const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const workbook = new ExcelJS.Workbook();
 
-        // Try multiple parsing strategies
-        // Strategy 1: row-array mode
-        const rowArrays = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-          header: 1,
-          raw: false,
-          defval: "",
-        });
+        if (file.name.endsWith(".csv")) {
+          const text = new TextDecoder().decode(data);
+          // For CSV, parse manually
+          const lines = text.split(/\r?\n/);
+          const csvSheet = workbook.addWorksheet("csv");
+          lines.forEach((line, i) => {
+            const cells = line.split(/[,;\t]/);
+            const row = csvSheet.getRow(i + 1);
+            cells.forEach((c, j) => row.getCell(j + 1).value = c.trim());
+          });
+        } else {
+          await workbook.xlsx.load(data);
+        }
 
-        // Strategy 2: also try named-column mode to find "ticker"/"symbol" column
-        const namedRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-          raw: false,
-          defval: "",
-        });
+        const sheet = workbook.worksheets[0];
+        if (!sheet) {
+          toast.error("Geen werkblad gevonden in het bestand.");
+          return;
+        }
 
         const tickers: string[] = [];
-
-        // First try named columns
-        if (namedRows.length > 0) {
-          const keys = Object.keys(namedRows[0]);
-          const tickerKey = keys.find((k) =>
-            /^(ticker|symbol|code|isin)$/i.test(k.trim())
-          ) || keys[0]; // fall back to first column
-
-          for (const row of namedRows) {
-            const val = String(row[tickerKey] ?? "").trim().toUpperCase();
-            if (val && val !== "#VALUE!" && val.length <= 20) {
-              tickers.push(val);
-            }
-          }
-        }
-
-        // If named approach yielded nothing, try array approach
-        if (tickers.length === 0) {
-          for (const row of rowArrays) {
-            if (!Array.isArray(row) || row.length === 0) continue;
-            // Try each column to find ticker-like values
-            for (const cell of row) {
-              const val = String(cell ?? "").trim().toUpperCase();
-              if (
-                val &&
-                val !== "#VALUE!" &&
-                val.length >= 1 &&
-                val.length <= 20 &&
-                /^[A-Z0-9.\- ]+$/.test(val)
-              ) {
-                tickers.push(val);
-                break; // take first matching cell per row
-              }
-            }
-          }
-        }
-
-        // Remove likely header rows
         const headerPatterns = ["TICKER", "SYMBOL", "CODE", "NAAM", "NAME", "ISIN", "SECURITY"];
-        const cleanedTickers = tickers.filter(
-          (t) => !headerPatterns.includes(t)
-        );
+
+        // Check first row for a header with ticker/symbol column
+        let tickerColIndex = 1; // default to first column
+        const firstRow = sheet.getRow(1);
+        if (firstRow) {
+          firstRow.eachCell((cell, colNumber) => {
+            const val = String(cell.value ?? "").trim().toUpperCase();
+            if (/^(TICKER|SYMBOL|CODE)$/.test(val)) {
+              tickerColIndex = colNumber;
+            }
+          });
+        }
+
+        sheet.eachRow((row, rowNumber) => {
+          // ExcelJS resolves formula results automatically
+          const cell = row.getCell(tickerColIndex);
+          const rawVal = cell.result ?? cell.value; // .result for formula cells
+          const val = String(rawVal ?? "").trim().toUpperCase();
+          if (
+            val &&
+            val !== "#VALUE!" &&
+            val.length >= 1 &&
+            val.length <= 20 &&
+            /^[A-Z0-9.\- ]+$/.test(val) &&
+            !headerPatterns.includes(val)
+          ) {
+            tickers.push(val);
+          }
+        });
+
+        const cleanedTickers = [...new Set(tickers)];
 
         if (cleanedTickers.length === 0) {
           toast.error(
