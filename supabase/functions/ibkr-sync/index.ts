@@ -110,7 +110,7 @@ serve(async (req) => {
     } = await anonClient.auth.getUser(authHeader.replace("Bearer ", ""));
     if (authError || !user) throw new Error("Unauthorized");
 
-    const { connectionId, refCode: existingRefCode } = await req.json();
+    const { connectionId, refCode: existingRefCode, queryIdOverride } = await req.json();
     if (!connectionId) throw new Error("Missing connectionId");
 
     // Get IBKR connection
@@ -142,7 +142,9 @@ serve(async (req) => {
         console.log("Reusing existing refCode:", existingRefCode);
         refCode = existingRefCode;
       } else {
-        refCode = await requestFlexReport(conn.flex_token, conn.flex_query_id);
+        const effectiveQueryId = queryIdOverride || conn.flex_query_id;
+        console.log("Using query ID:", effectiveQueryId, queryIdOverride ? "(override)" : "(default)");
+        refCode = await requestFlexReport(conn.flex_token, effectiveQueryId);
         console.log("New refCode:", refCode);
       }
 
