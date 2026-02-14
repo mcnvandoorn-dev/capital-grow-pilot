@@ -150,13 +150,41 @@ const Watchlist = () => {
         }
 
         sheet.eachRow((row, rowNumber) => {
-          // ExcelJS resolves formula results automatically
           const cell = row.getCell(tickerColIndex);
-          const rawVal = cell.result ?? cell.value; // .result for formula cells
+          // Try multiple value sources: calculated result, direct value, or formula text
+          let rawVal = cell.result ?? cell.value;
+
+          // If the value is an error object or #VALUE!, try extracting from formula text
+          const strVal = String(rawVal ?? "");
+          if (!rawVal || strVal === "#VALUE!" || (typeof rawVal === "object" && "error" in (rawVal as any))) {
+            // ExcelJS stores formulas; try to extract a ticker-like reference from it
+            const formula = (cell as any).formula || (cell as any)._value?.formula;
+            if (formula) {
+              // Common pattern: formulas referencing another sheet/cell like Sheet1!A2
+              // Try to find a plain ticker string within the formula
+              const refMatch = formula.match(/["']([A-Z0-9.\-]{1,20})["']/i);
+              if (refMatch) rawVal = refMatch[1];
+            }
+          }
+
+          // Also check other columns in the same row as fallback
+          if (!rawVal || String(rawVal).includes("#VALUE!")) {
+            for (let ci = 1; ci <= row.cellCount; ci++) {
+              const altCell = row.getCell(ci);
+              const altVal = String(altCell.result ?? altCell.value ?? "").trim().toUpperCase();
+              if (altVal && !altVal.includes("#VALUE!") && altVal.length >= 1 && altVal.length <= 10 && /^[A-Z0-9.\-]+$/.test(altVal) && !headerPatterns.includes(altVal)) {
+                rawVal = altVal;
+                break;
+              }
+            }
+          }
+
           const val = String(rawVal ?? "").trim().toUpperCase();
           if (
             val &&
-            val !== "#VALUE!" &&
+            !val.includes("#VALUE!") &&
+            !val.includes("#REF!") &&
+            !val.includes("#N/A") &&
             val.length >= 1 &&
             val.length <= 20 &&
             /^[A-Z0-9.\- ]+$/.test(val) &&
