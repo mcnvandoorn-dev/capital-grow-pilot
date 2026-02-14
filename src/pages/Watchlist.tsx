@@ -137,54 +137,59 @@ const Watchlist = () => {
         const tickers: string[] = [];
         const headerPatterns = ["TICKER", "SYMBOL", "CODE", "NAAM", "NAME", "ISIN", "SECURITY"];
 
-        // Check first row for a header with ticker/symbol column
-        let tickerColIndex = 1; // default to first column
+        // Helper to extract a string value from any ExcelJS cell
+        const getCellString = (cell: any): string => {
+          if (!cell) return "";
+          // Try .result first (formula cells), then .value
+          let v = cell.result ?? cell.value;
+          // Handle rich text objects
+          if (v && typeof v === "object") {
+            if ("richText" in v && Array.isArray(v.richText)) {
+              return v.richText.map((rt: any) => rt.text ?? "").join("");
+            }
+            if ("error" in v) return ""; // Excel error object
+            if ("text" in v) return String(v.text ?? "");
+            // ExcelJS sometimes wraps values
+            if ("result" in v) return String(v.result ?? "");
+          }
+          return String(v ?? "");
+        };
+
+        // Detect ticker column from header row
+        let tickerColIndex = 1;
+        let hasHeaderRow = false;
         const firstRow = sheet.getRow(1);
         if (firstRow) {
           firstRow.eachCell((cell, colNumber) => {
-            const val = String(cell.value ?? "").trim().toUpperCase();
+            const val = getCellString(cell).trim().toUpperCase();
             if (/^(TICKER|SYMBOL|CODE)$/.test(val)) {
               tickerColIndex = colNumber;
+              hasHeaderRow = true;
             }
           });
         }
 
         sheet.eachRow((row, rowNumber) => {
-          const cell = row.getCell(tickerColIndex);
-          // Try multiple value sources: calculated result, direct value, or formula text
-          let rawVal = cell.result ?? cell.value;
+          // Skip header row only if we detected an actual header
+          if (hasHeaderRow && rowNumber === 1) return;
 
-          // If the value is an error object or #VALUE!, try extracting from formula text
-          const strVal = String(rawVal ?? "");
-          if (!rawVal || strVal === "#VALUE!" || (typeof rawVal === "object" && "error" in (rawVal as any))) {
-            // ExcelJS stores formulas; try to extract a ticker-like reference from it
-            const formula = (cell as any).formula || (cell as any)._value?.formula;
-            if (formula) {
-              // Common pattern: formulas referencing another sheet/cell like Sheet1!A2
-              // Try to find a plain ticker string within the formula
-              const refMatch = formula.match(/["']([A-Z0-9.\-]{1,20})["']/i);
-              if (refMatch) rawVal = refMatch[1];
-            }
-          }
+          // Try the ticker column first
+          let val = getCellString(row.getCell(tickerColIndex)).trim().toUpperCase();
 
-          // Also check other columns in the same row as fallback
-          if (!rawVal || String(rawVal).includes("#VALUE!")) {
-            for (let ci = 1; ci <= row.cellCount; ci++) {
-              const altCell = row.getCell(ci);
-              const altVal = String(altCell.result ?? altCell.value ?? "").trim().toUpperCase();
-              if (altVal && !altVal.includes("#VALUE!") && altVal.length >= 1 && altVal.length <= 10 && /^[A-Z0-9.\-]+$/.test(altVal) && !headerPatterns.includes(altVal)) {
-                rawVal = altVal;
+          // If empty or error, scan all columns for a ticker-like value
+          if (!val || val.includes("#VALUE!") || val.includes("#REF!") || val.includes("#N/A")) {
+            for (let ci = 1; ci <= (row.cellCount || 10); ci++) {
+              const altVal = getCellString(row.getCell(ci)).trim().toUpperCase();
+              if (altVal && !altVal.includes("#") && altVal.length >= 1 && altVal.length <= 10 && /^[A-Z0-9.\-]+$/.test(altVal) && !headerPatterns.includes(altVal)) {
+                val = altVal;
                 break;
               }
             }
           }
 
-          const val = String(rawVal ?? "").trim().toUpperCase();
           if (
             val &&
-            !val.includes("#VALUE!") &&
-            !val.includes("#REF!") &&
-            !val.includes("#N/A") &&
+            !val.includes("#") &&
             val.length >= 1 &&
             val.length <= 20 &&
             /^[A-Z0-9.\- ]+$/.test(val) &&
