@@ -785,9 +785,13 @@ export type Database = {
           exit_horizon: string | null
           expected_growth_pct: number | null
           geography_label: string | null
+          has_loan: boolean
           id: string
           invested_amount: number
           is_active: boolean
+          loan_amount: number | null
+          loan_interest_rate: number | null
+          loan_monthly_payment: number | null
           name: string
           notes: string | null
           risk_bucket: string | null
@@ -806,9 +810,13 @@ export type Database = {
           exit_horizon?: string | null
           expected_growth_pct?: number | null
           geography_label?: string | null
+          has_loan?: boolean
           id?: string
           invested_amount: number
           is_active?: boolean
+          loan_amount?: number | null
+          loan_interest_rate?: number | null
+          loan_monthly_payment?: number | null
           name: string
           notes?: string | null
           risk_bucket?: string | null
@@ -827,9 +835,13 @@ export type Database = {
           exit_horizon?: string | null
           expected_growth_pct?: number | null
           geography_label?: string | null
+          has_loan?: boolean
           id?: string
           invested_amount?: number
           is_active?: boolean
+          loan_amount?: number | null
+          loan_interest_rate?: number | null
+          loan_monthly_payment?: number | null
           name?: string
           notes?: string | null
           risk_bucket?: string | null
