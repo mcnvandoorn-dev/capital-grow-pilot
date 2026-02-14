@@ -10,7 +10,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Link, RefreshCw, Plus, Trash2, FolderOpen } from "lucide-react";
+import { Settings, Link, RefreshCw, Plus, Trash2, FolderOpen, History } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +49,8 @@ const SettingsPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState<string | null>(null);
+  const [historyQueryId, setHistoryQueryId] = useState("");
 
   // Form state
   const [connectionName, setConnectionName] = useState("");
@@ -108,10 +110,13 @@ const SettingsPage = () => {
   });
 
   const syncMutation = useMutation({
-    mutationFn: async (params: { connectionId: string; refCode?: string }) => {
+    mutationFn: async (params: { connectionId: string; refCode?: string; queryIdOverride?: string }) => {
       const { data: { session } } = await supabase.auth.getSession();
 
       const callSync = async (refCode?: string): Promise<any> => {
+        const body: any = { connectionId: params.connectionId, refCode };
+        if (params.queryIdOverride) body.queryIdOverride = params.queryIdOverride;
+
         const res = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ibkr-sync`,
           {
@@ -121,7 +126,7 @@ const SettingsPage = () => {
               "Content-Type": "application/json",
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             },
-            body: JSON.stringify({ connectionId: params.connectionId, refCode }),
+            body: JSON.stringify(body),
           }
         );
         const json = await res.json();
@@ -129,7 +134,9 @@ const SettingsPage = () => {
 
         if (json.status === "pending" && json.refCode) {
           toast({
-            title: "IBKR rapport wordt gegenereerd...",
+            title: params.queryIdOverride
+              ? "Historisch rapport wordt gegenereerd..."
+              : "IBKR rapport wordt gegenereerd...",
             description: "Even geduld, we proberen het opnieuw.",
           });
           await new Promise((r) => setTimeout(r, 15000));
@@ -149,6 +156,8 @@ const SettingsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["ibkr-connections"] });
       queryClient.invalidateQueries({ queryKey: ["portfolios"] });
       queryClient.invalidateQueries({ queryKey: ["positions"] });
+      setHistoryOpen(null);
+      setHistoryQueryId("");
     },
     onError: (error: any) => {
       toast({ variant: "destructive", title: "Synchronisatie mislukt", description: error.message });
@@ -326,7 +335,16 @@ const SettingsPage = () => {
                       disabled={syncMutation.isPending || conn.sync_status === "syncing"}
                     >
                       <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-                      Synchroniseren
+                      Sync
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setHistoryOpen(conn.id)}
+                      disabled={syncMutation.isPending || conn.sync_status === "syncing"}
+                    >
+                      <History className="mr-1.5 h-3.5 w-3.5" />
+                      Historisch
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => deleteConnection.mutate(conn.id)}>
                       <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -338,6 +356,44 @@ const SettingsPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Historical import dialog */}
+      <Dialog open={!!historyOpen} onOpenChange={(o) => { if (!o) { setHistoryOpen(null); setHistoryQueryId(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Historische import</DialogTitle>
+            <DialogDescription>
+              Voer het Flex Query ID in van een Activity Statement dat een heel jaar beslaat.
+              Maak in IBKR Account Management een nieuwe Flex Query aan met periode "Last 365 Calendar Days" of een specifiek jaar,
+              inclusief Trades, Dividends en Cash Transactions.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (historyOpen && historyQueryId) {
+                syncMutation.mutate({ connectionId: historyOpen, queryIdOverride: historyQueryId });
+              }
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="histQueryId">Activity Statement Flex Query ID</Label>
+              <Input
+                id="histQueryId"
+                placeholder="Bijv. 789012"
+                value={historyQueryId}
+                onChange={(e) => setHistoryQueryId(e.target.value)}
+                required
+                maxLength={20}
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={syncMutation.isPending}>
+              {syncMutation.isPending ? "Importeren..." : "Historische data importeren"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Portfolio management */}
       <Card className="shadow-sm max-w-2xl">
