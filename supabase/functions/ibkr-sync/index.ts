@@ -201,7 +201,7 @@ serve(async (req) => {
               conid: t.conid || null,
               exchange: t.listingExchange || t.exchange || null,
               currency: (t.currency as any) || "USD",
-              asset_class: mapAssetClass(t.assetCategory, t.description),
+              asset_class: mapAssetClass(t.assetCategory, t.description, t.symbol),
               isin: t.isin || null,
             },
             { onConflict: "ticker,exchange" }
@@ -434,28 +434,30 @@ serve(async (req) => {
           console.log(`Stored FX rate: ${currency}/EUR = ${rate}`);
         }
 
-        // If no EUR-based account found, try to compute cross-rates
-        // e.g., if we have CAD→EUR and USD→CAD, compute USD→EUR
+        // If no EUR-based account found, fetch real USD→EUR rate from external API
         if (!fxRatesMap.has("USD")) {
-          // Check if we can get USD→EUR from existing DB rates or cross-rate
-          const { data: existingUsdRate } = await supabase
-            .from("fx_rates")
-            .select("rate")
-            .eq("from_currency", "USD")
-            .eq("to_currency", "EUR")
-            .order("rate_date", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          
-          // If stored rate is 1.0 (incorrect), try to fix via cross-rate
-          if (!existingUsdRate || existingUsdRate.rate === 1) {
-            // USD positions exist - try to derive from CAD account
-            const cadRate = fxRatesMap.get("CAD");
-            if (cadRate) {
-              // If we have CAD→EUR from EUR-based account, we can estimate
-              // For now, use a reasonable market rate
-              console.log("Warning: USD→EUR rate unavailable from IBKR, CAD→EUR =", cadRate);
+          try {
+            const fxRes = await fetch("https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR");
+            if (fxRes.ok) {
+              const fxJson = await fxRes.json();
+              const usdToEur = fxJson.rates?.EUR;
+              if (usdToEur && typeof usdToEur === "number") {
+                console.log(`Fetched real USD→EUR rate: ${usdToEur}`);
+                await supabase.from("fx_rates").upsert(
+                  {
+                    from_currency: "USD" as any,
+                    to_currency: "EUR" as any,
+                    rate: Math.round(usdToEur * 1000000) / 1000000,
+                    rate_date: today,
+                    source: "FRANKFURTER",
+                  },
+                  { onConflict: "from_currency,to_currency,rate_date" }
+                );
+                fxRatesMap.set("USD", usdToEur);
+              }
             }
+          } catch (fxErr) {
+            console.log("Warning: Could not fetch USD→EUR rate:", fxErr);
           }
         }
 
@@ -474,7 +476,7 @@ serve(async (req) => {
                 conid: agg.conid,
                 exchange: agg.exchange,
                 currency: agg.currency as any,
-                asset_class: mapAssetClass(agg.assetCategory, agg.description),
+                asset_class: mapAssetClass(agg.assetCategory, agg.description, agg.symbol),
                 isin: agg.isin,
               },
             { onConflict: "ticker,exchange" }
@@ -619,21 +621,54 @@ function formatDate(d: string): string {
   return d;
 }
 
+// Known tickers for asset class detection
+const KNOWN_BDCS = new Set([
+  "ARCC","BXSL","CSWC","FDUS","GLAD","HTGC","MSDL","NCDL","OBDC","TPVG","TSLX",
+  "MAIN","PSEC","GBDC","OCSL","ORCC","GSBD","FSK","GAIN","NEWT","SLRC","TCPC",
+  "BBDC","PFLT","SAR","SCM","CCAP","CGBD","NMFC","PNNT","TRIN","MRCC",
+]);
+const KNOWN_CEFS = new Set([
+  "DSU","ECC","EIC","FSCO","KIO","MCI","MPV","OXLC","PTY","XFLT","PDI",
+  "GOF","AWP","UTF","USA","RQI","RNP","JPC","JPS","JRI","HYT","BGT","BTZ",
+  "BST","BIGZ","CII","EOI","ETJ","EVV","FFC","HIO","HIX","IVH","JFR","KYN",
+  "MHI","NAD","NRK","NUV","NZF","PHK","PML","RFI","RVT","THQ","THW","UTG",
+]);
+const KNOWN_BABY_BONDS = new Set([
+  "ATHS","BIPH","AFGE","KMPB","NEWTG","OXLCG","ADAMO",
+  "APTS","ATLCL","CSWCZ","ECCB","ECCF","ECCV","ECCW","ECCX","GDV PRK",
+  "NEWTI","OXLCN","OXLCO","RILYM","RILYN","RILYO","RILYP","OXSQ",
+]);
+
 function mapAssetClass(
   ibkrClass: string | undefined,
-  description?: string | null
+  description?: string | null,
+  ticker?: string | null,
 ): "CEF" | "BDC" | "REIT" | "ETF" | "PREFERRED" | "BABY_BOND" | "OTHER" {
-  // First try description-based detection (more reliable than IBKR assetCategory)
+  // 1. Check known tickers first (most reliable)
+  const baseTicker = (ticker || "").split(" ")[0].toUpperCase();
+  if (KNOWN_BDCS.has(baseTicker) || KNOWN_BDCS.has(ticker?.toUpperCase() || "")) return "BDC";
+  if (KNOWN_CEFS.has(baseTicker) || KNOWN_CEFS.has(ticker?.toUpperCase() || "")) return "CEF";
+  if (KNOWN_BABY_BONDS.has(baseTicker) || KNOWN_BABY_BONDS.has(ticker?.toUpperCase() || "")) return "BABY_BOND";
+
+  // 2. Description-based detection
   if (description) {
     const d = description.toUpperCase();
     if (d.includes("REAL ESTATE") || d.includes("REIT")) return "REIT";
     if (d.includes("BDC") || d.includes("BUSINESS DEVELOPMENT")) return "BDC";
-    if (d.includes("PREFERRED") || d.includes("PFD")) return "PREFERRED";
-    if (d.includes("BABY BOND")) return "BABY_BOND";
+    if (d.includes("PREFERRED") || d.includes("PFD") || d.includes("PFD SER")) return "PREFERRED";
+    if (d.includes("BABY BOND") || d.includes("FIXED RATE") || d.includes("NOTES DUE")) return "BABY_BOND";
     if (d.includes("SPLIT CORP") || d.includes("CLOSED-END") || d.includes("CLOSED END")) return "CEF";
-    if (d.includes("ETF") || d.includes("FUND") || d.includes("TRUST UNITS")) return "ETF";
+    if (d.includes("DIRECT LEND") || d.includes("SECURED LENDING") || d.includes("SPECIALTY LEND") || 
+        d.includes("CAPITAL CORP") || d.includes("INVESTMENT CORP") || d.includes("CREDIT CO")) return "BDC";
+    if (d.includes("INCOME FUND") || d.includes("INCOME OPP") || d.includes("CREDIT FUND") ||
+        d.includes("DEBT STRATEGIES") || d.includes("FLTNG RT")) return "CEF";
+    if (d.includes("ETF") || d.includes("TRUST UNITS")) return "ETF";
   }
-  // Fallback to IBKR asset category
+
+  // 3. Ticker pattern: " PR" suffix often = preferred
+  if (ticker && /\s+PR[A-Z]?$/.test(ticker.toUpperCase())) return "PREFERRED";
+
+  // 4. Fallback to IBKR asset category
   if (!ibkrClass) return "OTHER";
   const c = ibkrClass.toUpperCase();
   if (c.includes("ETF") || c.includes("FUND")) return "ETF";
