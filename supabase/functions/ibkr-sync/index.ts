@@ -192,6 +192,8 @@ serve(async (req) => {
         if (!t.symbol || !t.tradeDate) continue;
 
         // Upsert security
+        const assetClass = mapAssetClass(t.assetCategory, t.description, t.symbol);
+        const sectorInfo = mapSectorIndustry(t.symbol, assetClass);
         const { data: sec } = await supabase
           .from("securities")
           .upsert(
@@ -201,8 +203,9 @@ serve(async (req) => {
               conid: t.conid || null,
               exchange: t.listingExchange || t.exchange || null,
               currency: (t.currency as any) || "USD",
-              asset_class: mapAssetClass(t.assetCategory, t.description, t.symbol),
+              asset_class: assetClass,
               isin: t.isin || null,
+              ...(sectorInfo ? { sector: sectorInfo.sector, industry: sectorInfo.industry } : {}),
             },
             { onConflict: "ticker,exchange" }
           )
@@ -467,6 +470,8 @@ serve(async (req) => {
         // Process aggregated positions
         for (const [, agg] of posAgg) {
           // Upsert security
+          const assetClass = mapAssetClass(agg.assetCategory, agg.description, agg.symbol);
+          const sectorInfo = mapSectorIndustry(agg.symbol, assetClass);
           const { data: sec } = await supabase
             .from("securities")
             .upsert(
@@ -476,8 +481,9 @@ serve(async (req) => {
                 conid: agg.conid,
                 exchange: agg.exchange,
                 currency: agg.currency as any,
-                asset_class: mapAssetClass(agg.assetCategory, agg.description, agg.symbol),
+                asset_class: assetClass,
                 isin: agg.isin,
+                ...(sectorInfo ? { sector: sectorInfo.sector, industry: sectorInfo.industry } : {}),
               },
             { onConflict: "ticker,exchange" }
           )
@@ -638,6 +644,77 @@ const KNOWN_BABY_BONDS = new Set([
   "APTS","ATLCL","CSWCZ","ECCB","ECCF","ECCV","ECCW","ECCX","GDV PRK",
   "NEWTI","OXLCN","OXLCO","RILYM","RILYN","RILYO","RILYP","OXSQ",
 ]);
+
+// Sector/industry mapping for known tickers and asset classes
+const TICKER_SECTOR_MAP: Record<string, { sector: string; industry: string }> = {
+  // BDCs
+  ARCC: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  BXSL: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  CSWC: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  FDUS: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  GLAD: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  HTGC: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  MSDL: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  NCDL: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  OBDC: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  TPVG: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  TSLX: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  MAIN: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  PSEC: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  GBDC: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  NEWT: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  // CEFs - CLO/Structured Credit
+  ECC: { sector: "Fixed Income", industry: "CLO & Structured Credit" },
+  EIC: { sector: "Fixed Income", industry: "CLO & Structured Credit" },
+  XFLT: { sector: "Fixed Income", industry: "CLO & Structured Credit" },
+  OXLC: { sector: "Fixed Income", industry: "CLO & Structured Credit" },
+  // CEFs - Multi-Sector Credit
+  DSU: { sector: "Fixed Income", industry: "Multi-Sector Credit" },
+  FSCO: { sector: "Fixed Income", industry: "Multi-Sector Credit" },
+  KIO: { sector: "Fixed Income", industry: "Multi-Sector Credit" },
+  PDI: { sector: "Fixed Income", industry: "Multi-Sector Credit" },
+  PTY: { sector: "Fixed Income", industry: "Multi-Sector Credit" },
+  // CEFs - Corporate Credit
+  MCI: { sector: "Fixed Income", industry: "Corporate Credit" },
+  MPV: { sector: "Fixed Income", industry: "Corporate Credit" },
+  // Preferred - by issuer
+  "CODI PRC": { sector: "Industrials", industry: "Diversified Holdings" },
+  "DX PRC": { sector: "Real Estate", industry: "Mortgage REIT" },
+  "IIPR PRA": { sector: "Real Estate", industry: "Specialty REIT" },
+  RWTQ: { sector: "Financial Services", industry: "Mortgage Finance" },
+  "TEN PRF": { sector: "Energy", industry: "Marine Transportation" },
+  "ECC PRD": { sector: "Fixed Income", industry: "CLO & Structured Credit" },
+  // Baby Bonds - by issuer
+  ADAMO: { sector: "Financial Services", industry: "Asset Management" },
+  AFGE: { sector: "Financial Services", industry: "Insurance" },
+  ATHS: { sector: "Financial Services", industry: "Insurance" },
+  BIPH: { sector: "Utilities", industry: "Infrastructure" },
+  KMPB: { sector: "Financial Services", industry: "Insurance" },
+  NEWTG: { sector: "Financial Services", industry: "Small Business Lending" },
+  OXLCG: { sector: "Fixed Income", industry: "CLO & Structured Credit" },
+};
+
+// Default sector by asset class (fallback)
+const ASSET_CLASS_DEFAULT_SECTOR: Record<string, { sector: string; industry: string }> = {
+  BDC: { sector: "Financial Services", industry: "Asset Management & Direct Lending" },
+  CEF: { sector: "Fixed Income", industry: "Multi-Sector Credit" },
+  REIT: { sector: "Real Estate", industry: "Diversified REIT" },
+  ETF: { sector: "Diversified", industry: "Exchange-Traded Fund" },
+  PREFERRED: { sector: "Financial Services", industry: "Preferred Securities" },
+  BABY_BOND: { sector: "Financial Services", industry: "Fixed Income Securities" },
+};
+
+function mapSectorIndustry(ticker: string, assetClass: string): { sector: string; industry: string } | null {
+  // 1. Exact ticker match
+  const upper = ticker.toUpperCase();
+  if (TICKER_SECTOR_MAP[upper]) return TICKER_SECTOR_MAP[upper];
+  // 2. Base ticker match (for prefs like "ECC PRD" → check "ECC")
+  const base = upper.split(" ")[0];
+  if (TICKER_SECTOR_MAP[base]) return TICKER_SECTOR_MAP[base];
+  // 3. Asset class default
+  if (ASSET_CLASS_DEFAULT_SECTOR[assetClass]) return ASSET_CLASS_DEFAULT_SECTOR[assetClass];
+  return null;
+}
 
 function mapAssetClass(
   ibkrClass: string | undefined,
