@@ -178,13 +178,15 @@ async function fetchCEFData(ticker: string): Promise<{
   }
 }
 
-// Use AI as fallback for CEF data
-async function fetchCEFDataAI(ticker: string): Promise<{
+// Use AI to fetch NAV/Z-Score for CEFs or BDCs
+async function fetchNavZScoreAI(ticker: string, assetClass: string): Promise<{
   nav: number | null;
   zScore: number | null;
 } | null> {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
   if (!apiKey) return null;
+  
+  const typeLabel = assetClass === "BDC" ? "Business Development Company (BDC)" : "closed-end fund (CEF)";
   
   try {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -197,7 +199,9 @@ async function fetchCEFDataAI(ticker: string): Promise<{
         model: "google/gemini-2.5-flash",
         messages: [{
           role: "user",
-          content: `What is the current NAV (Net Asset Value per share) and 6-month Z-Score for the closed-end fund "${ticker}"? 
+          content: `What is the current NAV (Net Asset Value per share) and 6-month Z-Score (price vs NAV discount z-statistic) for the ${typeLabel} "${ticker}"?
+For BDCs, NAV is typically reported quarterly. Use the most recent known NAV per share.
+Z-Score measures how many standard deviations the current premium/discount is from the 6-month average.
 Reply ONLY with JSON: {"nav": <number or null>, "z_score": <number or null>}
 If you don't know the exact current values, provide your best estimate based on recent data. Reply only JSON, no markdown.`,
         }],
@@ -213,13 +217,13 @@ If you don't know the exact current values, provide your best estimate based on 
     
     const cleaned = answer.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
     const parsed = JSON.parse(cleaned);
-    console.log(`AI CEF data for ${ticker}:`, JSON.stringify(parsed));
+    console.log(`AI ${assetClass} data for ${ticker}:`, JSON.stringify(parsed));
     return {
       nav: typeof parsed.nav === "number" ? parsed.nav : null,
       zScore: typeof parsed.z_score === "number" ? parsed.z_score : null,
     };
   } catch (e) {
-    console.log(`AI CEF data error for ${ticker}:`, e);
+    console.log(`AI ${assetClass} data error for ${ticker}:`, e);
     return null;
   }
 }
@@ -279,25 +283,32 @@ Deno.serve(async (req) => {
       const results = await Promise.all(batch.map(async (sec: any) => {
         const ticker = sec.ticker;
         const isCEF = sec.asset_class === "CEF";
+        const isBDC = sec.asset_class === "BDC";
         
         console.log(`Processing ${ticker} (${sec.asset_class})...`);
         
         // Fetch Yahoo data for all tickers
         const yahoo = await fetchYahooChart(ticker);
         
-        // Fetch CEF-specific data
-        let cefData: { nav: number | null; zScore: number | null; marketPrice?: number | null } | null = null;
+        // Fetch NAV/Z-Score for CEFs and BDCs
+        let navData: { nav: number | null; zScore: number | null; marketPrice?: number | null } | null = null;
         if (isCEF) {
-          cefData = await fetchCEFData(ticker);
-          if (!cefData?.nav && !cefData?.zScore) {
-            const aiData = await fetchCEFDataAI(ticker);
+          navData = await fetchCEFData(ticker);
+          if (!navData?.nav && !navData?.zScore) {
+            const aiData = await fetchNavZScoreAI(ticker, "CEF");
             if (aiData) {
-              cefData = { ...cefData, ...aiData };
+              navData = { ...navData, ...aiData };
             }
+          }
+        } else if (isBDC) {
+          // BDCs: use AI to get NAV and Z-Score
+          const aiData = await fetchNavZScoreAI(ticker, "BDC");
+          if (aiData) {
+            navData = { nav: aiData.nav, zScore: aiData.zScore };
           }
         }
         
-        return { sec, yahoo, cefData };
+        return { sec, yahoo, cefData: navData };
       }));
       
       // Upsert results
