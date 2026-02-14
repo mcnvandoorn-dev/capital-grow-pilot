@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Trash2, Building2, DollarSign, TrendingUp, Wallet, PieChart, Lock } from "lucide-react";
+import { Trash2, Building2, DollarSign, TrendingUp, Wallet, PieChart, Lock, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PrivateInvestment, useDeletePrivateInvestment, usePrivateInvestmentMetrics } from "@/hooks/usePrivateInvestments";
 import { AddPrivateInvestmentDialog } from "./AddPrivateInvestmentDialog";
@@ -163,6 +163,11 @@ export function PrivateInvestmentsSection({
                             <Badge variant="outline" className="text-xs">{ASSET_TYPE_LABELS[inv.asset_type] ?? inv.asset_type}</Badge>
                             {inv.sector_label && <Badge variant="secondary" className="text-xs">{inv.sector_label}</Badge>}
                             {inv.geography_label && <span className="text-xs text-muted-foreground">{inv.geography_label}</span>}
+                            {inv.has_loan && (
+                              <Badge variant="outline" className="text-xs gap-0.5">
+                                <Landmark className="h-3 w-3" /> Lening {inv.loan_amount ? fmt(inv.loan_amount) : ""}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </div>

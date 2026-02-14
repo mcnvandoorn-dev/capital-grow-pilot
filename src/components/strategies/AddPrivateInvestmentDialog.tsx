@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useAddPrivateInvestment } from "@/hooks/usePrivateInvestments";
 import { toast } from "sonner";
 
@@ -48,6 +49,10 @@ export function AddPrivateInvestmentDialog() {
     geography_label: "",
     risk_bucket: "",
     notes: "",
+    has_loan: false,
+    loan_amount: "",
+    loan_interest_rate: "",
+    loan_monthly_payment: "",
   });
 
   const update = (key: string, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
@@ -76,6 +81,10 @@ export function AddPrivateInvestmentDialog() {
         geography_label: form.geography_label || null,
         risk_bucket: form.risk_bucket || null,
         notes: form.notes || null,
+        has_loan: form.has_loan,
+        loan_amount: form.has_loan && form.loan_amount ? parseFloat(form.loan_amount) : null,
+        loan_interest_rate: form.has_loan && form.loan_interest_rate ? parseFloat(form.loan_interest_rate) : null,
+        loan_monthly_payment: form.has_loan && form.loan_monthly_payment ? parseFloat(form.loan_monthly_payment) : null,
       });
       toast.success("Private investering toegevoegd");
       setOpen(false);
@@ -84,6 +93,7 @@ export function AddPrivateInvestmentDialog() {
         annual_cashflow: "", cashflow_frequency: "annually", expected_growth_pct: "",
         start_date: new Date().toISOString().split("T")[0], exit_horizon: "", currency: "EUR",
         sector_label: "", geography_label: "", risk_bucket: "", notes: "",
+        has_loan: false, loan_amount: "", loan_interest_rate: "", loan_monthly_payment: "",
       });
     } catch (err: any) {
       toast.error(err.message ?? "Fout bij opslaan");
@@ -209,6 +219,30 @@ export function AddPrivateInvestmentDialog() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Loan */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Lening afgesloten?</Label>
+              <Switch checked={form.has_loan} onCheckedChange={(v) => setForm(prev => ({ ...prev, has_loan: v }))} />
+            </div>
+            {form.has_loan && (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Leningbedrag</Label>
+                  <Input type="number" step="0.01" min="0" value={form.loan_amount} onChange={(e) => update("loan_amount", e.target.value)} placeholder="150000" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Rente %</Label>
+                  <Input type="number" step="0.01" min="0" value={form.loan_interest_rate} onChange={(e) => update("loan_interest_rate", e.target.value)} placeholder="3.5" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Maandlast</Label>
+                  <Input type="number" step="0.01" min="0" value={form.loan_monthly_payment} onChange={(e) => update("loan_monthly_payment", e.target.value)} placeholder="750" />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notes */}
