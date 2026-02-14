@@ -112,8 +112,13 @@ const SettingsPage = () => {
   const syncMutation = useMutation({
     mutationFn: async (params: { connectionId: string; refCode?: string; queryIdOverride?: string }) => {
       const { data: { session } } = await supabase.auth.getSession();
+      const MAX_CLIENT_RETRIES = 5;
 
-      const callSync = async (refCode?: string): Promise<any> => {
+      const callSync = async (refCode?: string, attempt = 0): Promise<any> => {
+        if (attempt >= MAX_CLIENT_RETRIES) {
+          throw new Error("IBKR rapport kon niet worden opgehaald na meerdere pogingen. Probeer het later opnieuw — IBKR heeft soms meer tijd nodig om rapporten te genereren.");
+        }
+
         const body: any = { connectionId: params.connectionId, refCode };
         if (params.queryIdOverride) body.queryIdOverride = params.queryIdOverride;
 
@@ -136,11 +141,11 @@ const SettingsPage = () => {
           toast({
             title: params.queryIdOverride
               ? "Historisch rapport wordt gegenereerd..."
-              : "IBKR rapport wordt gegenereerd...",
+              : `IBKR rapport wordt gegenereerd... (poging ${attempt + 1}/${MAX_CLIENT_RETRIES})`,
             description: "Even geduld, we proberen het opnieuw.",
           });
           await new Promise((r) => setTimeout(r, 15000));
-          return callSync(json.refCode);
+          return callSync(json.refCode, attempt + 1);
         }
 
         return json;
@@ -159,8 +164,13 @@ const SettingsPage = () => {
       setHistoryOpen(null);
       setHistoryQueryId("");
     },
-    onError: (error: any) => {
+    onError: async (error: any, variables) => {
       toast({ variant: "destructive", title: "Synchronisatie mislukt", description: error.message });
+      // Reset sync status so the button is usable again
+      await supabase
+        .from("ibkr_connections")
+        .update({ sync_status: "idle" })
+        .eq("id", variables.connectionId);
       queryClient.invalidateQueries({ queryKey: ["ibkr-connections"] });
     },
   });
