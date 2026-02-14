@@ -342,6 +342,36 @@ export type Database = {
           },
         ]
       }
+      exposure_snapshots: {
+        Row: {
+          created_at: string
+          exposure_data: Json
+          id: string
+          reconciliation_delta: number | null
+          snapshot_date: string
+          total_value: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          exposure_data: Json
+          id?: string
+          reconciliation_delta?: number | null
+          snapshot_date?: string
+          total_value: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          exposure_data?: Json
+          id?: string
+          reconciliation_delta?: number | null
+          snapshot_date?: string
+          total_value?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       fundamental_data: {
         Row: {
           created_at: string
@@ -469,6 +499,59 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      issuer_exposures: {
+        Row: {
+          confidence: string
+          created_at: string
+          exposure_type: string
+          generated_at: string
+          id: string
+          label: string
+          security_id: string
+          source: string
+          source_url: string | null
+          sub_label: string | null
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          confidence?: string
+          created_at?: string
+          exposure_type: string
+          generated_at?: string
+          id?: string
+          label: string
+          security_id: string
+          source?: string
+          source_url?: string | null
+          sub_label?: string | null
+          updated_at?: string
+          weight: number
+        }
+        Update: {
+          confidence?: string
+          created_at?: string
+          exposure_type?: string
+          generated_at?: string
+          id?: string
+          label?: string
+          security_id?: string
+          source?: string
+          source_url?: string | null
+          sub_label?: string | null
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issuer_exposures_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       market_data: {
         Row: {

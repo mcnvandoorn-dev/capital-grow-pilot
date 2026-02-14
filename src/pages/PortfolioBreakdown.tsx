@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import { BreakdownChart } from "@/components/breakdown/BreakdownChart";
 import { PositionWeightsTable } from "@/components/breakdown/PositionWeightsTable";
 import { BreakdownInsights } from "@/components/breakdown/BreakdownInsights";
+import { LookThroughDashboard } from "@/components/breakdown/LookThroughDashboard";
 import { usePortfolios, usePositions } from "@/hooks/usePortfolioData";
 import { usePortfolioBreakdown } from "@/hooks/usePortfolioBreakdown";
 import { PieChart, BarChart3 } from "lucide-react";
@@ -135,17 +136,22 @@ export default function PortfolioBreakdown() {
         </CardContent>
       </Card>
 
+      {/* Look-Through Exposure Engine */}
+      <LookThroughDashboard positions={positions!} />
+
       {/* AI Insights */}
-      <BreakdownInsights
-        data={{
-          assetType: assetTypeBreakdown,
-          sector: sectorBreakdown,
-          region: regionBreakdown,
-          currency: currencyBreakdown,
-          dividendVsGrowth,
-          topPositions: positionWeights,
-        }}
-      />
+      <div className="mt-6">
+        <BreakdownInsights
+          data={{
+            assetType: assetTypeBreakdown,
+            sector: sectorBreakdown,
+            region: regionBreakdown,
+            currency: currencyBreakdown,
+            dividendVsGrowth,
+            topPositions: positionWeights,
+          }}
+        />
+      </div>
     </AppLayout>
   );
 }

@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.ibkr-daily]
 verify_jwt = false
+
+[functions.look-through-analyze]
+verify_jwt = false
