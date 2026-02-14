@@ -46,56 +46,36 @@ export function useAddToWatchlist() {
   });
 }
 
-export function useBulkAddToWatchlist() {
+/** Look up which tickers already exist in the securities table */
+export async function lookupExistingTickers(tickers: string[]): Promise<Set<string>> {
+  if (tickers.length === 0) return new Set();
+  const { data } = await supabase
+    .from("securities")
+    .select("ticker")
+    .in("ticker", tickers);
+  return new Set((data ?? []).map((s) => s.ticker));
+}
+
+/** Bulk import via edge function (handles security creation with service role) */
+export function useBulkImportWatchlist() {
   const qc = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (tickers: string[]) => {
-      // Find or create securities for these tickers
-      const uniqueTickers = [...new Set(tickers.map((t) => t.toUpperCase().trim()).filter(Boolean))];
-
-      // Get existing securities
-      const { data: existing, error: fetchErr } = await supabase
-        .from("securities")
-        .select("id, ticker")
-        .in("ticker", uniqueTickers);
-      if (fetchErr) throw fetchErr;
-
-      const existingMap = new Map((existing ?? []).map((s) => [s.ticker, s.id]));
-      const missing = uniqueTickers.filter((t) => !existingMap.has(t));
-
-      // Create missing securities
-      if (missing.length > 0) {
-        const { data: created, error: createErr } = await supabase
-          .from("securities")
-          .insert(missing.map((ticker) => ({ ticker, asset_class: "OTHER" as const })))
-          .select("id, ticker");
-        if (createErr) throw createErr;
-        created?.forEach((s) => existingMap.set(s.ticker, s.id));
-      }
-
-      // Get existing watchlist items to avoid duplicates
-      const { data: existingWl } = await supabase
-        .from("watchlist")
-        .select("security_id")
-        .eq("user_id", user!.id);
-      const existingWlIds = new Set((existingWl ?? []).map((w) => w.security_id));
-
-      const toInsert = uniqueTickers
-        .map((t) => existingMap.get(t))
-        .filter((id): id is string => !!id && !existingWlIds.has(id))
-        .map((security_id) => ({ security_id, user_id: user!.id }));
-
-      if (toInsert.length === 0) return { added: 0, skipped: uniqueTickers.length };
-
-      const { error: insertErr } = await supabase.from("watchlist").insert(toInsert);
-      if (insertErr) throw insertErr;
-
-      return { added: toInsert.length, skipped: uniqueTickers.length - toInsert.length };
+      const { data, error } = await supabase.functions.invoke("bulk-upsert-securities", {
+        body: { tickers },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data as { added: number; skipped: number; total: number };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["watchlist"] }),
   });
+}
+
+// Keep legacy hook for backward compat but route through edge function
+export function useBulkAddToWatchlist() {
+  return useBulkImportWatchlist();
 }
 
 export function useRemoveFromWatchlist() {
