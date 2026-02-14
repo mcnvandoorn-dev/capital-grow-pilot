@@ -30,7 +30,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Eye, Plus, Search, Trash2, Upload, Bell, CheckCircle2, AlertTriangle, XCircle, Loader2 } from "lucide-react";
+import { Eye, Plus, Search, Trash2, Upload, Bell, CheckCircle2, AlertTriangle, XCircle, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import {
   useWatchlist,
@@ -40,6 +40,9 @@ import {
   lookupExistingTickers,
 } from "@/hooks/useWatchlist";
 import { useSecuritiesForSelect, useCreateAlert } from "@/hooks/useAlerts";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/components/auth/AuthProvider";
 import type { Database } from "@/integrations/supabase/types";
 import { generateImportPreview, getImportableTickers, type ImportResult } from "@/lib/importEngine";
 
@@ -74,6 +77,8 @@ const Watchlist = () => {
   const bulkImport = useBulkImportWatchlist();
   const removeFromWatchlist = useRemoveFromWatchlist();
   const createAlert = useCreateAlert();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const [search, setSearch] = useState("");
   const [assetFilter, setAssetFilter] = useState<string>("all");
@@ -86,6 +91,7 @@ const Watchlist = () => {
   const [alertThreshold, setAlertThreshold] = useState("");
   const [alertSecurityId, setAlertSecurityId] = useState("");
   const [alertTicker, setAlertTicker] = useState("");
+  const [syncing, setSyncing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Import preview state
@@ -223,12 +229,36 @@ const Watchlist = () => {
     : null;
   const importableCount = previewCounts ? previewCounts.valid + previewCounts.unknown : 0;
 
+  const handleSyncMarketData = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("fetch-watchlist-market-data");
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Marktdata bijgewerkt voor ${data.updated} ticker(s)`);
+      queryClient.invalidateQueries({ queryKey: ["watchlist"] });
+    } catch (err) {
+      toast.error(`Sync mislukt: ${err instanceof Error ? err.message : "onbekend"}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <AppLayout
       title="Watchlist"
       subtitle="Volg bedrijven en stel automatische alerts in"
       actions={
         <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleSyncMarketData}
+            disabled={syncing}
+          >
+            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing..." : "Sync data"}
+          </Button>
           <Button
             size="sm"
             variant="outline"

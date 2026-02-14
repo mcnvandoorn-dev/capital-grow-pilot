@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.ticker-insights]
 verify_jwt = false
+
+[functions.fetch-watchlist-market-data]
+verify_jwt = false
