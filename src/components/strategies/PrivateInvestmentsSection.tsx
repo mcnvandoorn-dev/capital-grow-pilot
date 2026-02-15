@@ -84,7 +84,9 @@ export function PrivateInvestmentsSection({
             const totalEquityCurrent = metrics.totalCurrentValue - totalLoanCurrent;
             const roeTotal = totalEquityInvested > 0 ? ((totalEquityCurrent - totalEquityInvested) / totalEquityInvested) * 100 : 0;
             const totalLoanCosts = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_monthly_payment ?? 0) * 12 : 0), 0);
-            const netYieldEV = totalEquityCurrent > 0 ? ((metrics.totalAnnualCashflow - totalLoanCosts) / totalEquityCurrent) * 100 : 0;
+            const totalMonthlyCosts = investments.reduce((s, i) => s + (i.monthly_costs ?? 0), 0);
+            const totalAnnualCosts = totalLoanCosts + totalMonthlyCosts * 12;
+            const netYieldEV = totalEquityCurrent > 0 ? ((metrics.totalAnnualCashflow - totalAnnualCosts) / totalEquityCurrent) * 100 : 0;
 
             return (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -122,7 +124,7 @@ export function PrivateInvestmentsSection({
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                       <Wallet className="h-4 w-4" /> Netto cashflow/mnd
                     </div>
-                    <p className="text-xl font-semibold tabular-nums">{fmt((metrics.totalAnnualCashflow - totalLoanCosts) / 12)}</p>
+                    <p className="text-xl font-semibold tabular-nums">{fmt((metrics.totalAnnualCashflow - totalAnnualCosts) / 12)}</p>
                   </CardContent>
                 </Card>
                 <Card className="shadow-sm">
@@ -169,7 +171,8 @@ export function PrivateInvestmentsSection({
                       const equityCurrent = currentValue - loanCurrent;
                       const roe = equityInvested > 0 ? ((equityCurrent - equityInvested) / equityInvested) * 100 : 0;
                       const annualLoanCost = inv.has_loan ? (inv.loan_monthly_payment ?? 0) * 12 : 0;
-                      const netCashflow = inv.annual_cashflow - annualLoanCost;
+                      const annualMonthlyCosts = (inv.monthly_costs ?? 0) * 12;
+                      const netCashflow = inv.annual_cashflow - annualLoanCost - annualMonthlyCosts;
                       const netYieldOnEquity = equityInvested > 0 ? (netCashflow / equityInvested) * 100 : 0;
 
                       return (
@@ -200,7 +203,9 @@ export function PrivateInvestmentsSection({
                         const tEquityCurrent = metrics.totalCurrentValue - tLoanCurrent;
                         const tRoe = tEquityInvested > 0 ? ((tEquityCurrent - tEquityInvested) / tEquityInvested) * 100 : 0;
                         const tLoanCosts = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_monthly_payment ?? 0) * 12 : 0), 0);
-                        const tNetYield = tEquityInvested > 0 ? ((metrics.totalAnnualCashflow - tLoanCosts) / tEquityInvested) * 100 : 0;
+                        const tMonthlyCosts = investments.reduce((s, i) => s + (i.monthly_costs ?? 0), 0);
+                        const tTotalAnnualCosts = tLoanCosts + tMonthlyCosts * 12;
+                        const tNetYield = tEquityInvested > 0 ? ((metrics.totalAnnualCashflow - tTotalAnnualCosts) / tEquityInvested) * 100 : 0;
 
                         return (
                           <tr className="border-t font-semibold text-xs">
@@ -213,7 +218,7 @@ export function PrivateInvestmentsSection({
                             <td className={cn("py-2 text-right tabular-nums", tRoe >= 0 ? "text-positive" : "text-negative")}>
                               {`${tRoe >= 0 ? "+" : ""}${tRoe.toFixed(1)}%`}
                             </td>
-                            <td className="py-2 text-right tabular-nums">{fmt((metrics.totalAnnualCashflow - tLoanCosts) / 12)}</td>
+                            <td className="py-2 text-right tabular-nums">{fmt((metrics.totalAnnualCashflow - tTotalAnnualCosts) / 12)}</td>
                             <td className="py-2 text-right tabular-nums font-medium">{`${tNetYield.toFixed(1)}%`}</td>
                           </tr>
                         );
@@ -287,7 +292,7 @@ export function PrivateInvestmentsSection({
                           {(() => {
                             const monthlyCashflow = inv.annual_cashflow / 12;
                             const monthlyLoanCost = inv.has_loan ? (inv.loan_monthly_payment ?? 0) : 0;
-                            const netMonthly = monthlyCashflow - monthlyLoanCost;
+                            const netMonthly = monthlyCashflow - monthlyLoanCost - (inv.monthly_costs ?? 0);
                             return monthlyCashflow > 0 ? (
                               <p className="text-xs text-muted-foreground tabular-nums">
                                 {fmt(netMonthly)}/mnd netto

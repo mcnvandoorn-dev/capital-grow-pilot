@@ -1,0 +1,1 @@
+ALTER TABLE public.private_investments ADD COLUMN monthly_costs numeric DEFAULT 0;

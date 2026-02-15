@@ -793,6 +793,7 @@ export type Database = {
           loan_current_balance: number | null
           loan_interest_rate: number | null
           loan_monthly_payment: number | null
+          monthly_costs: number | null
           name: string
           notes: string | null
           risk_bucket: string | null
@@ -819,6 +820,7 @@ export type Database = {
           loan_current_balance?: number | null
           loan_interest_rate?: number | null
           loan_monthly_payment?: number | null
+          monthly_costs?: number | null
           name: string
           notes?: string | null
           risk_bucket?: string | null
@@ -845,6 +847,7 @@ export type Database = {
           loan_current_balance?: number | null
           loan_interest_rate?: number | null
           loan_monthly_payment?: number | null
+          monthly_costs?: number | null
           name?: string
           notes?: string | null
           risk_bucket?: string | null
