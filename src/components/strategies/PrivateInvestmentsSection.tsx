@@ -28,12 +28,12 @@ export function PrivateInvestmentsSection({
   investments,
   fmt,
   publicValue,
-  publicIncome,
+  publicForwardIncome,
 }: {
   investments: PrivateInvestment[];
   fmt: (v: number) => string;
   publicValue: number;
-  publicIncome: number;
+  publicForwardIncome: number;
 }) {
   const deleteMutation = useDeletePrivateInvestment();
   const metrics = usePrivateInvestmentMetrics(investments);
@@ -41,8 +41,15 @@ export function PrivateInvestmentsSection({
 
   const totalPortfolioValue = publicValue + metrics.totalCurrentValue;
   const privatePct = totalPortfolioValue > 0 ? (metrics.totalCurrentValue / totalPortfolioValue) * 100 : 0;
-  const totalIncome = publicIncome + metrics.totalAnnualCashflow;
-  const privateIncomePct = totalIncome > 0 ? (metrics.totalAnnualCashflow / totalIncome) * 100 : 0;
+
+  // Private NET income: gross cashflow - monthly costs - loan payments
+  const totalLoanCosts = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_monthly_payment ?? 0) * 12 : 0), 0);
+  const totalMonthlyCosts = investments.reduce((s, i) => s + (i.monthly_costs ?? 0), 0);
+  const totalAnnualCosts = totalLoanCosts + totalMonthlyCosts * 12;
+  const privateNetIncome = metrics.totalAnnualCashflow - totalAnnualCosts;
+
+  const totalIncome = publicForwardIncome + privateNetIncome;
+  const privateIncomePct = totalIncome > 0 ? (privateNetIncome / totalIncome) * 100 : 0;
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Weet je zeker dat je "${name}" wilt verwijderen?`)) return;
@@ -251,8 +258,8 @@ export function PrivateInvestmentsSection({
                 </div>
               </div>
               <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                <span>Public: {fmt(publicIncome)} ({(100 - privateIncomePct).toFixed(1)}%)</span>
-                <span>Private: {fmt(metrics.totalAnnualCashflow)} ({privateIncomePct.toFixed(1)}%)</span>
+                <span>Public: {fmt(publicForwardIncome)} ({(100 - privateIncomePct).toFixed(1)}%)</span>
+                <span>Private: {fmt(privateNetIncome)} ({privateIncomePct.toFixed(1)}%)</span>
               </div>
             </CardContent>
           </Card>
