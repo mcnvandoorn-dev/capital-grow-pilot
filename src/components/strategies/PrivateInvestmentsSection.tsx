@@ -115,6 +115,100 @@ export function PrivateInvestmentsSection({
             </Card>
           </div>
 
+          {/* Rendement op Eigen Vermogen */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" /> Rendement op Eigen Vermogen
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-muted-foreground text-xs">
+                      <th className="text-left py-2 font-medium">Investering</th>
+                      <th className="text-right py-2 font-medium">Inleg</th>
+                      <th className="text-right py-2 font-medium">Lening</th>
+                      <th className="text-right py-2 font-medium">Eigen Vermogen</th>
+                      <th className="text-right py-2 font-medium">Waarde</th>
+                      <th className="text-right py-2 font-medium">Waardegroei EV</th>
+                      <th className="text-right py-2 font-medium">Cashflow/jr</th>
+                      <th className="text-right py-2 font-medium">Leninglasten/jr</th>
+                      <th className="text-right py-2 font-medium">Netto Yield EV</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {investments.map((inv) => {
+                      const loan = inv.has_loan ? (inv.loan_amount ?? 0) : 0;
+                      const equity = inv.invested_amount - loan;
+                      const currentValue = inv.current_value ?? inv.invested_amount;
+                      const equityValue = currentValue - loan;
+                      const capitalGainOnEquity = equity > 0 ? ((equityValue - equity) / equity) * 100 : 0;
+                      const annualLoanCost = inv.has_loan ? (inv.loan_monthly_payment ?? 0) * 12 : 0;
+                      const netCashflow = inv.annual_cashflow - annualLoanCost;
+                      const netYieldOnEquity = equity > 0 ? (netCashflow / equity) * 100 : 0;
+
+                      return (
+                        <tr key={inv.id} className="border-b last:border-0">
+                          <td className="py-2 font-medium truncate max-w-[140px]">{inv.name}</td>
+                          <td className="py-2 text-right tabular-nums">{fmt(inv.invested_amount)}</td>
+                          <td className="py-2 text-right tabular-nums">{loan > 0 ? fmt(loan) : "—"}</td>
+                          <td className="py-2 text-right tabular-nums font-medium">{fmt(equity)}</td>
+                          <td className="py-2 text-right tabular-nums">{fmt(currentValue)}</td>
+                          <td className={cn("py-2 text-right tabular-nums", capitalGainOnEquity >= 0 ? "text-positive" : "text-negative")}>
+                            {inv.current_value != null ? `${capitalGainOnEquity >= 0 ? "+" : ""}${capitalGainOnEquity.toFixed(1)}%` : "—"}
+                          </td>
+                          <td className="py-2 text-right tabular-nums">{fmt(inv.annual_cashflow)}</td>
+                          <td className="py-2 text-right tabular-nums">{annualLoanCost > 0 ? fmt(-annualLoanCost) : "—"}</td>
+                          <td className={cn("py-2 text-right tabular-nums font-medium", netYieldOnEquity >= 0 ? "text-positive" : "text-negative")}>
+                            {equity > 0 ? `${netYieldOnEquity.toFixed(1)}%` : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  {investments.length > 1 && (
+                    <tfoot>
+                      <tr className="border-t font-semibold text-xs">
+                        <td className="py-2">Totaal</td>
+                        <td className="py-2 text-right tabular-nums">{fmt(metrics.totalInvested)}</td>
+                        <td className="py-2 text-right tabular-nums">
+                          {(() => { const tl = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_amount ?? 0) : 0), 0); return tl > 0 ? fmt(tl) : "—"; })()}
+                        </td>
+                        <td className="py-2 text-right tabular-nums">
+                          {(() => { const te = investments.reduce((s, i) => s + i.invested_amount - (i.has_loan ? (i.loan_amount ?? 0) : 0), 0); return fmt(te); })()}
+                        </td>
+                        <td className="py-2 text-right tabular-nums">{fmt(metrics.totalCurrentValue)}</td>
+                        <td className={cn("py-2 text-right tabular-nums", metrics.unrealizedPnl >= 0 ? "text-positive" : "text-negative")}>
+                          {(() => {
+                            const te = investments.reduce((s, i) => s + i.invested_amount - (i.has_loan ? (i.loan_amount ?? 0) : 0), 0);
+                            const tl = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_amount ?? 0) : 0), 0);
+                            const ev = metrics.totalCurrentValue - tl;
+                            const roe = te > 0 ? ((ev - te) / te) * 100 : 0;
+                            return `${roe >= 0 ? "+" : ""}${roe.toFixed(1)}%`;
+                          })()}
+                        </td>
+                        <td className="py-2 text-right tabular-nums">{fmt(metrics.totalAnnualCashflow)}</td>
+                        <td className="py-2 text-right tabular-nums">
+                          {(() => { const tc = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_monthly_payment ?? 0) * 12 : 0), 0); return tc > 0 ? fmt(-tc) : "—"; })()}
+                        </td>
+                        <td className="py-2 text-right tabular-nums font-medium">
+                          {(() => {
+                            const te = investments.reduce((s, i) => s + i.invested_amount - (i.has_loan ? (i.loan_amount ?? 0) : 0), 0);
+                            const tc = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_monthly_payment ?? 0) * 12 : 0), 0);
+                            const ny = te > 0 ? ((metrics.totalAnnualCashflow - tc) / te) * 100 : 0;
+                            return `${ny.toFixed(1)}%`;
+                          })()}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Income split */}
           <Card className="shadow-sm">
             <CardHeader className="pb-3">
