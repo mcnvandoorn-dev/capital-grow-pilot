@@ -15,6 +15,7 @@ import {
   PieChart,
   Wallet,
   LayoutDashboard,
+  Percent,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +27,7 @@ import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePrivateInvestments, usePrivateInvestmentMetrics } from "@/hooks/usePrivateInvestments";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 function formatAmount(value: number, currency: "EUR" | "USD") {
   return new Intl.NumberFormat("nl-NL", {
@@ -55,6 +57,7 @@ function useEurToUsd() {
 
 const Index = () => {
   const { currency } = useDisplayCurrency();
+  const { user } = useAuth();
   const { data: eurToUsd } = useEurToUsd();
   const rate = currency === "EUR" ? 1 : (eurToUsd ?? 1);
   const fmt = (v: number) => formatAmount(v * rate, currency);
@@ -72,6 +75,47 @@ const Index = () => {
   // Private investments
   const { data: privateInvestments } = usePrivateInvestments();
   const privateMetrics = usePrivateInvestmentMetrics(privateInvestments ?? undefined);
+
+  // Private cashflows YTD (actual received)
+  const { data: privateCashflowsYTD } = useQuery({
+    queryKey: ["private-cashflows-ytd", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split("T")[0];
+      const { data, error } = await supabase
+        .from("private_investment_cashflows")
+        .select("amount")
+        .gte("cashflow_date", startOfYear);
+      if (error) throw error;
+      return (data ?? []).reduce((sum, d) => sum + d.amount, 0);
+    },
+  });
+
+  // Forward annual dividends (public) from fundamental_data dividend_yield
+  const securityIds = useMemo(
+    () => [...new Set((positions ?? []).map((p) => p.security_id))],
+    [positions]
+  );
+  const { data: fundamentalYields } = useQuery({
+    queryKey: ["fundamental-yields", securityIds],
+    enabled: securityIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("fundamental_data")
+        .select("security_id, dividend_yield, data_date")
+        .in("security_id", securityIds)
+        .order("data_date", { ascending: false });
+      if (error) throw error;
+      // Latest yield per security
+      const map = new Map<string, number>();
+      for (const fd of data ?? []) {
+        if (!map.has(fd.security_id) && fd.dividend_yield != null) {
+          map.set(fd.security_id, fd.dividend_yield);
+        }
+      }
+      return map;
+    },
+  });
 
   const isLoading = loadingPortfolios || loadingPositions;
   const hasPositions = (positions?.length ?? 0) > 0 || (privateInvestments?.length ?? 0) > 0;
@@ -111,18 +155,35 @@ const Index = () => {
   const totalCost = publicCost + privateMetrics.totalInvested;
   const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
 
-  // Netto maandelijkse cashflow (privaat) + dividend YTD (publiek)
-  const nettoMonthlyCashflow = (privateMetrics.totalAnnualCashflow / 12) - privateMonthlyCosts;
+  // ─── KPI 1: Maandelijkse cashflow YTD ───
+  const now = new Date();
+  const monthsElapsed = Math.max(1, now.getMonth() + (now.getDate() / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()));
+  const totalCashflowYTD = (dividendsYTD ?? 0) + (privateCashflowsYTD ?? 0);
+  const monthlyCashflowYTD = totalCashflowYTD / monthsElapsed;
+
+  // ─── KPI 2: Forward yield (%) ───
+  const publicForwardAnnualDividends = useMemo(() => {
+    if (!positions || !fundamentalYields) return 0;
+    return positions.reduce((sum, p) => {
+      const yieldPct = fundamentalYields.get(p.security_id) ?? 0;
+      const mv = p.market_value ?? p.total_cost_basis;
+      return sum + (yieldPct / 100) * mv;
+    }, 0);
+  }, [positions, fundamentalYields]);
+
+  const privateNetAnnualCashflow = privateMetrics.totalAnnualCashflow - (privateMonthlyCosts * 12);
+  const forwardAnnualCashflow = publicForwardAnnualDividends + privateNetAnnualCashflow;
+  const forwardYieldPct = totalValue > 0 ? (forwardAnnualCashflow / totalValue) * 100 : 0;
 
   const positionCount = (positions?.length ?? 0) + (privateInvestments?.length ?? 0);
 
   return (
     <AppLayout title="Portfolio" subtitle="Overzicht van al je strategieën samen" actions={<CurrencyToggle />}>
       {/* KPI row */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-6">
         {isLoading ? (
           <>
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 5 }).map((_, i) => (
               <Card key={i} className="shadow-sm">
                 <CardContent className="p-5">
                   <Skeleton className="h-4 w-20 mb-2" />
@@ -153,10 +214,16 @@ const Index = () => {
               icon={TrendingUp}
             />
             <KpiCard
-              label="Dividend YTD + Netto cashflow/mnd"
-              value={fmt(dividendsYTD ?? 0)}
-              subtitle={`Privaat netto: ${fmt(nettoMonthlyCashflow)}/mnd`}
+              label="Maandelijkse cashflow YTD"
+              value={fmt(monthlyCashflowYTD)}
+              subtitle={`Totaal ontvangen YTD: ${fmt(totalCashflowYTD)}`}
               icon={Wallet}
+            />
+            <KpiCard
+              label="Forward yield (jaar)"
+              value={`${forwardYieldPct.toFixed(2)}%`}
+              subtitle={`Verwacht: ${fmt(forwardAnnualCashflow)}/jaar`}
+              icon={Percent}
             />
             <KpiCard
               label="Posities"
