@@ -80,12 +80,14 @@ export function PrivateInvestmentsSection({
           {(() => {
             const totalLoanStart = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_amount ?? 0) : 0), 0);
             const totalLoanCurrent = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_current_balance ?? i.loan_amount ?? 0) : 0), 0);
-            const totalEquity = metrics.totalCurrentValue - totalLoanCurrent;
             const totalEquityInvested = metrics.totalInvested - totalLoanStart;
-            const roeTotal = totalEquityInvested > 0 ? ((totalEquity - totalEquityInvested) / totalEquityInvested) * 100 : 0;
+            const totalEquityCurrent = metrics.totalCurrentValue - totalLoanCurrent;
+            const roeTotal = totalEquityInvested > 0 ? ((totalEquityCurrent - totalEquityInvested) / totalEquityInvested) * 100 : 0;
+            const totalLoanCosts = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_monthly_payment ?? 0) * 12 : 0), 0);
+            const netYieldEV = totalEquityInvested > 0 ? ((metrics.totalAnnualCashflow - totalLoanCosts) / totalEquityInvested) * 100 : 0;
 
             return (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 <Card className="shadow-sm">
                   <CardContent className="p-5">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
@@ -98,33 +100,21 @@ export function PrivateInvestmentsSection({
                 <Card className="shadow-sm">
                   <CardContent className="p-5">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                      <TrendingUp className="h-4 w-4" /> Ongerealiseerd P/L
+                      <TrendingUp className="h-4 w-4" /> Eigen Vermogen
                     </div>
-                    <p className={cn("text-xl font-semibold tabular-nums", metrics.unrealizedPnl >= 0 ? "text-positive" : "text-negative")}>
-                      {fmt(metrics.unrealizedPnl)}
-                      <span className="text-sm font-normal ml-1">({metrics.unrealizedPnlPct >= 0 ? "+" : ""}{metrics.unrealizedPnlPct.toFixed(1)}%)</span>
+                    <p className="text-xl font-semibold tabular-nums">{fmt(totalEquityCurrent)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Inleg EV: {fmt(totalEquityInvested)}</p>
+                  </CardContent>
+                </Card>
+                <Card className="shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                      <TrendingUp className="h-4 w-4" /> ROE
+                    </div>
+                    <p className={cn("text-xl font-semibold tabular-nums", roeTotal >= 0 ? "text-positive" : "text-negative")}>
+                      {roeTotal >= 0 ? "+" : ""}{roeTotal.toFixed(1)}%
                     </p>
-                  </CardContent>
-                </Card>
-                <Card className="shadow-sm">
-                  <CardContent className="p-5">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                      <Landmark className="h-4 w-4" /> Start lening
-                    </div>
-                    <p className="text-xl font-semibold tabular-nums">{totalLoanStart > 0 ? fmt(totalLoanStart) : "—"}</p>
-                  </CardContent>
-                </Card>
-                <Card className="shadow-sm">
-                  <CardContent className="p-5">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                      <Landmark className="h-4 w-4" /> Huidige lening
-                    </div>
-                    <p className="text-xl font-semibold tabular-nums">{totalLoanCurrent > 0 ? fmt(totalLoanCurrent) : "—"}</p>
-                    {totalLoanStart > 0 && totalLoanCurrent > 0 && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {fmt(totalLoanStart - totalLoanCurrent)} afgelost
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground mt-0.5">Netto yield: {netYieldEV.toFixed(1)}%/jr</p>
                   </CardContent>
                 </Card>
                 <Card className="shadow-sm">
