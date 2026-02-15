@@ -17,6 +17,7 @@ import { useDividendIntelligence } from "@/hooks/useDividendIntelligence";
 import { DividendIntelligencePanel } from "@/components/strategies/DividendIntelligencePanel";
 import { usePrivateInvestments } from "@/hooks/usePrivateInvestments";
 import { PrivateInvestmentsSection } from "@/components/strategies/PrivateInvestmentsSection";
+import { usePrivateInvestmentMetrics } from "@/hooks/usePrivateInvestments";
 
 function useEurToUsd() {
   return useQuery({
@@ -101,6 +102,10 @@ const Strategies = () => {
   const { data: divWcg } = useDividendsYTD(strategyPortfolioIds.WORKING_CAPITAL_GROWTH);
   const { data: privateInvestments } = usePrivateInvestments();
 
+  // Forward annual income for all public portfolios (last 12 months annualized)
+  const { data: allDividendIntel } = useDividendIntelligence(allPortfolioIds, allPositions ?? undefined);
+  const publicForwardIncome = allDividendIntel?.totalAnnualIncome ?? 0;
+
   return (
     <AppLayout title="Strategieën" subtitle="Bekijk je portfolio's per strategie" actions={<CurrencyToggle />}>
       <Tabs defaultValue="buyhold" className="space-y-6">
@@ -151,7 +156,7 @@ const Strategies = () => {
             investments={privateInvestments ?? []}
             fmt={fmt}
             publicValue={allPositions?.reduce((s, p) => s + (p.market_value ?? p.total_cost_basis), 0) ?? 0}
-            publicIncome={(divBuyHold ?? 0) + (divDividend ?? 0) + (divWcg ?? 0)}
+            publicForwardIncome={publicForwardIncome}
           />
         </TabsContent>
       </Tabs>
