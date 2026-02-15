@@ -23,6 +23,7 @@ export type PrivateInvestment = {
   loan_amount: number | null;
   loan_interest_rate: number | null;
   loan_monthly_payment: number | null;
+  loan_current_balance: number | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

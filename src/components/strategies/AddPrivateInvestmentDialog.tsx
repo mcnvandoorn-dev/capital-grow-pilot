@@ -53,6 +53,7 @@ export function AddPrivateInvestmentDialog() {
     loan_amount: "",
     loan_interest_rate: "",
     loan_monthly_payment: "",
+    loan_current_balance: "",
   });
 
   const update = (key: string, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
@@ -85,6 +86,7 @@ export function AddPrivateInvestmentDialog() {
         loan_amount: form.has_loan && form.loan_amount ? parseFloat(form.loan_amount) : null,
         loan_interest_rate: form.has_loan && form.loan_interest_rate ? parseFloat(form.loan_interest_rate) : null,
         loan_monthly_payment: form.has_loan && form.loan_monthly_payment ? parseFloat(form.loan_monthly_payment) : null,
+        loan_current_balance: form.has_loan && form.loan_current_balance ? parseFloat(form.loan_current_balance) : null,
       });
       toast.success("Private investering toegevoegd");
       setOpen(false);
@@ -93,7 +95,7 @@ export function AddPrivateInvestmentDialog() {
         annual_cashflow: "", cashflow_frequency: "annually", expected_growth_pct: "",
         start_date: new Date().toISOString().split("T")[0], exit_horizon: "", currency: "EUR",
         sector_label: "", geography_label: "", risk_bucket: "", notes: "",
-        has_loan: false, loan_amount: "", loan_interest_rate: "", loan_monthly_payment: "",
+        has_loan: false, loan_amount: "", loan_interest_rate: "", loan_monthly_payment: "", loan_current_balance: "",
       });
     } catch (err: any) {
       toast.error(err.message ?? "Fout bij opslaan");
@@ -228,10 +230,14 @@ export function AddPrivateInvestmentDialog() {
               <Switch checked={form.has_loan} onCheckedChange={(v) => setForm(prev => ({ ...prev, has_loan: v }))} />
             </div>
             {form.has_loan && (
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Leningbedrag</Label>
+                  <Label>Start leningbedrag</Label>
                   <Input type="number" step="0.01" min="0" value={form.loan_amount} onChange={(e) => update("loan_amount", e.target.value)} placeholder="150000" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Huidig leningsaldo</Label>
+                  <Input type="number" step="0.01" min="0" value={form.loan_current_balance} onChange={(e) => update("loan_current_balance", e.target.value)} placeholder="140000" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Rente %</Label>

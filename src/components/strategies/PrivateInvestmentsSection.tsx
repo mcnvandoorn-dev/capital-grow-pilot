@@ -75,45 +75,76 @@ export function PrivateInvestmentsSection({
       ) : (
         <>
           {/* KPI's: Totaal overzicht */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card className="shadow-sm">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                  <DollarSign className="h-4 w-4" /> Private waarde
-                </div>
-                <p className="text-xl font-semibold tabular-nums">{fmt(metrics.totalCurrentValue)}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{privatePct.toFixed(1)}% van totaal</p>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                  <TrendingUp className="h-4 w-4" /> Ongerealiseerd P/L
-                </div>
-                <p className={cn("text-xl font-semibold tabular-nums", metrics.unrealizedPnl >= 0 ? "text-positive" : "text-negative")}>
-                  {fmt(metrics.unrealizedPnl)}
-                  <span className="text-sm font-normal ml-1">({metrics.unrealizedPnlPct >= 0 ? "+" : ""}{metrics.unrealizedPnlPct.toFixed(1)}%)</span>
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                  <Wallet className="h-4 w-4" /> Private cashflow/jr
-                </div>
-                <p className="text-xl font-semibold tabular-nums">{fmt(metrics.totalAnnualCashflow)}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{privateIncomePct.toFixed(1)}% van totaal income</p>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                  <Lock className="h-4 w-4" /> Illiquid exposure
-                </div>
-                <p className="text-xl font-semibold tabular-nums">{privatePct.toFixed(1)}%</p>
-              </CardContent>
-            </Card>
-          </div>
+          {(() => {
+            const totalLoanStart = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_amount ?? 0) : 0), 0);
+            const totalLoanCurrent = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_current_balance ?? i.loan_amount ?? 0) : 0), 0);
+            const totalEquity = metrics.totalCurrentValue - totalLoanCurrent;
+            const totalEquityInvested = metrics.totalInvested - totalLoanStart;
+            const roeTotal = totalEquityInvested > 0 ? ((totalEquity - totalEquityInvested) / totalEquityInvested) * 100 : 0;
+
+            return (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+                <Card className="shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                      <DollarSign className="h-4 w-4" /> Private waarde
+                    </div>
+                    <p className="text-xl font-semibold tabular-nums">{fmt(metrics.totalCurrentValue)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{privatePct.toFixed(1)}% van totaal</p>
+                  </CardContent>
+                </Card>
+                <Card className="shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                      <TrendingUp className="h-4 w-4" /> Ongerealiseerd P/L
+                    </div>
+                    <p className={cn("text-xl font-semibold tabular-nums", metrics.unrealizedPnl >= 0 ? "text-positive" : "text-negative")}>
+                      {fmt(metrics.unrealizedPnl)}
+                      <span className="text-sm font-normal ml-1">({metrics.unrealizedPnlPct >= 0 ? "+" : ""}{metrics.unrealizedPnlPct.toFixed(1)}%)</span>
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                      <Landmark className="h-4 w-4" /> Start lening
+                    </div>
+                    <p className="text-xl font-semibold tabular-nums">{totalLoanStart > 0 ? fmt(totalLoanStart) : "—"}</p>
+                  </CardContent>
+                </Card>
+                <Card className="shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                      <Landmark className="h-4 w-4" /> Huidige lening
+                    </div>
+                    <p className="text-xl font-semibold tabular-nums">{totalLoanCurrent > 0 ? fmt(totalLoanCurrent) : "—"}</p>
+                    {totalLoanStart > 0 && totalLoanCurrent > 0 && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {fmt(totalLoanStart - totalLoanCurrent)} afgelost
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card className="shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                      <Wallet className="h-4 w-4" /> Private cashflow/jr
+                    </div>
+                    <p className="text-xl font-semibold tabular-nums">{fmt(metrics.totalAnnualCashflow)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{privateIncomePct.toFixed(1)}% van totaal income</p>
+                  </CardContent>
+                </Card>
+                <Card className="shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                      <Lock className="h-4 w-4" /> Illiquid exposure
+                    </div>
+                    <p className="text-xl font-semibold tabular-nums">{privatePct.toFixed(1)}%</p>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })()}
 
           {/* Rendement op Eigen Vermogen */}
           <Card className="shadow-sm">
@@ -126,13 +157,14 @@ export function PrivateInvestmentsSection({
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b text-muted-foreground text-xs">
+                     <tr className="border-b text-muted-foreground text-xs">
                       <th className="text-left py-2 font-medium">Investering</th>
                       <th className="text-right py-2 font-medium">Inleg</th>
-                      <th className="text-right py-2 font-medium">Lening</th>
+                      <th className="text-right py-2 font-medium">Start lening</th>
+                      <th className="text-right py-2 font-medium">Huidige lening</th>
                       <th className="text-right py-2 font-medium">Eigen Vermogen</th>
                       <th className="text-right py-2 font-medium">Waarde</th>
-                      <th className="text-right py-2 font-medium">Waardegroei EV</th>
+                      <th className="text-right py-2 font-medium">ROE</th>
                       <th className="text-right py-2 font-medium">Cashflow/jr</th>
                       <th className="text-right py-2 font-medium">Leninglasten/jr</th>
                       <th className="text-right py-2 font-medium">Netto Yield EV</th>
@@ -140,29 +172,31 @@ export function PrivateInvestmentsSection({
                   </thead>
                   <tbody>
                     {investments.map((inv) => {
-                      const loan = inv.has_loan ? (inv.loan_amount ?? 0) : 0;
-                      const equity = inv.invested_amount - loan;
+                      const loanStart = inv.has_loan ? (inv.loan_amount ?? 0) : 0;
+                      const loanCurrent = inv.has_loan ? (inv.loan_current_balance ?? inv.loan_amount ?? 0) : 0;
+                      const equityInvested = inv.invested_amount - loanStart;
                       const currentValue = inv.current_value ?? inv.invested_amount;
-                      const equityValue = currentValue - loan;
-                      const capitalGainOnEquity = equity > 0 ? ((equityValue - equity) / equity) * 100 : 0;
+                      const equityCurrent = currentValue - loanCurrent;
+                      const roe = equityInvested > 0 ? ((equityCurrent - equityInvested) / equityInvested) * 100 : 0;
                       const annualLoanCost = inv.has_loan ? (inv.loan_monthly_payment ?? 0) * 12 : 0;
                       const netCashflow = inv.annual_cashflow - annualLoanCost;
-                      const netYieldOnEquity = equity > 0 ? (netCashflow / equity) * 100 : 0;
+                      const netYieldOnEquity = equityInvested > 0 ? (netCashflow / equityInvested) * 100 : 0;
 
                       return (
                         <tr key={inv.id} className="border-b last:border-0">
                           <td className="py-2 font-medium truncate max-w-[140px]">{inv.name}</td>
                           <td className="py-2 text-right tabular-nums">{fmt(inv.invested_amount)}</td>
-                          <td className="py-2 text-right tabular-nums">{loan > 0 ? fmt(loan) : "—"}</td>
-                          <td className="py-2 text-right tabular-nums font-medium">{fmt(equity)}</td>
+                          <td className="py-2 text-right tabular-nums">{loanStart > 0 ? fmt(loanStart) : "—"}</td>
+                          <td className="py-2 text-right tabular-nums">{loanCurrent > 0 ? fmt(loanCurrent) : "—"}</td>
+                          <td className="py-2 text-right tabular-nums font-medium">{fmt(equityCurrent)}</td>
                           <td className="py-2 text-right tabular-nums">{fmt(currentValue)}</td>
-                          <td className={cn("py-2 text-right tabular-nums", capitalGainOnEquity >= 0 ? "text-positive" : "text-negative")}>
-                            {inv.current_value != null ? `${capitalGainOnEquity >= 0 ? "+" : ""}${capitalGainOnEquity.toFixed(1)}%` : "—"}
+                          <td className={cn("py-2 text-right tabular-nums", roe >= 0 ? "text-positive" : "text-negative")}>
+                            {inv.current_value != null ? `${roe >= 0 ? "+" : ""}${roe.toFixed(1)}%` : "—"}
                           </td>
                           <td className="py-2 text-right tabular-nums">{fmt(inv.annual_cashflow)}</td>
                           <td className="py-2 text-right tabular-nums">{annualLoanCost > 0 ? fmt(-annualLoanCost) : "—"}</td>
                           <td className={cn("py-2 text-right tabular-nums font-medium", netYieldOnEquity >= 0 ? "text-positive" : "text-negative")}>
-                            {equity > 0 ? `${netYieldOnEquity.toFixed(1)}%` : "—"}
+                            {equityInvested > 0 ? `${netYieldOnEquity.toFixed(1)}%` : "—"}
                           </td>
                         </tr>
                       );
@@ -170,38 +204,32 @@ export function PrivateInvestmentsSection({
                   </tbody>
                   {investments.length > 1 && (
                     <tfoot>
-                      <tr className="border-t font-semibold text-xs">
-                        <td className="py-2">Totaal</td>
-                        <td className="py-2 text-right tabular-nums">{fmt(metrics.totalInvested)}</td>
-                        <td className="py-2 text-right tabular-nums">
-                          {(() => { const tl = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_amount ?? 0) : 0), 0); return tl > 0 ? fmt(tl) : "—"; })()}
-                        </td>
-                        <td className="py-2 text-right tabular-nums">
-                          {(() => { const te = investments.reduce((s, i) => s + i.invested_amount - (i.has_loan ? (i.loan_amount ?? 0) : 0), 0); return fmt(te); })()}
-                        </td>
-                        <td className="py-2 text-right tabular-nums">{fmt(metrics.totalCurrentValue)}</td>
-                        <td className={cn("py-2 text-right tabular-nums", metrics.unrealizedPnl >= 0 ? "text-positive" : "text-negative")}>
-                          {(() => {
-                            const te = investments.reduce((s, i) => s + i.invested_amount - (i.has_loan ? (i.loan_amount ?? 0) : 0), 0);
-                            const tl = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_amount ?? 0) : 0), 0);
-                            const ev = metrics.totalCurrentValue - tl;
-                            const roe = te > 0 ? ((ev - te) / te) * 100 : 0;
-                            return `${roe >= 0 ? "+" : ""}${roe.toFixed(1)}%`;
-                          })()}
-                        </td>
-                        <td className="py-2 text-right tabular-nums">{fmt(metrics.totalAnnualCashflow)}</td>
-                        <td className="py-2 text-right tabular-nums">
-                          {(() => { const tc = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_monthly_payment ?? 0) * 12 : 0), 0); return tc > 0 ? fmt(-tc) : "—"; })()}
-                        </td>
-                        <td className="py-2 text-right tabular-nums font-medium">
-                          {(() => {
-                            const te = investments.reduce((s, i) => s + i.invested_amount - (i.has_loan ? (i.loan_amount ?? 0) : 0), 0);
-                            const tc = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_monthly_payment ?? 0) * 12 : 0), 0);
-                            const ny = te > 0 ? ((metrics.totalAnnualCashflow - tc) / te) * 100 : 0;
-                            return `${ny.toFixed(1)}%`;
-                          })()}
-                        </td>
-                      </tr>
+                      {(() => {
+                        const tLoanStart = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_amount ?? 0) : 0), 0);
+                        const tLoanCurrent = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_current_balance ?? i.loan_amount ?? 0) : 0), 0);
+                        const tEquityInvested = metrics.totalInvested - tLoanStart;
+                        const tEquityCurrent = metrics.totalCurrentValue - tLoanCurrent;
+                        const tRoe = tEquityInvested > 0 ? ((tEquityCurrent - tEquityInvested) / tEquityInvested) * 100 : 0;
+                        const tLoanCosts = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_monthly_payment ?? 0) * 12 : 0), 0);
+                        const tNetYield = tEquityInvested > 0 ? ((metrics.totalAnnualCashflow - tLoanCosts) / tEquityInvested) * 100 : 0;
+
+                        return (
+                          <tr className="border-t font-semibold text-xs">
+                            <td className="py-2">Totaal</td>
+                            <td className="py-2 text-right tabular-nums">{fmt(metrics.totalInvested)}</td>
+                            <td className="py-2 text-right tabular-nums">{tLoanStart > 0 ? fmt(tLoanStart) : "—"}</td>
+                            <td className="py-2 text-right tabular-nums">{tLoanCurrent > 0 ? fmt(tLoanCurrent) : "—"}</td>
+                            <td className="py-2 text-right tabular-nums">{fmt(tEquityCurrent)}</td>
+                            <td className="py-2 text-right tabular-nums">{fmt(metrics.totalCurrentValue)}</td>
+                            <td className={cn("py-2 text-right tabular-nums", tRoe >= 0 ? "text-positive" : "text-negative")}>
+                              {`${tRoe >= 0 ? "+" : ""}${tRoe.toFixed(1)}%`}
+                            </td>
+                            <td className="py-2 text-right tabular-nums">{fmt(metrics.totalAnnualCashflow)}</td>
+                            <td className="py-2 text-right tabular-nums">{tLoanCosts > 0 ? fmt(-tLoanCosts) : "—"}</td>
+                            <td className="py-2 text-right tabular-nums font-medium">{`${tNetYield.toFixed(1)}%`}</td>
+                          </tr>
+                        );
+                      })()}
                     </tfoot>
                   )}
                 </table>

@@ -790,6 +790,7 @@ export type Database = {
           invested_amount: number
           is_active: boolean
           loan_amount: number | null
+          loan_current_balance: number | null
           loan_interest_rate: number | null
           loan_monthly_payment: number | null
           name: string
@@ -815,6 +816,7 @@ export type Database = {
           invested_amount: number
           is_active?: boolean
           loan_amount?: number | null
+          loan_current_balance?: number | null
           loan_interest_rate?: number | null
           loan_monthly_payment?: number | null
           name: string
@@ -840,6 +842,7 @@ export type Database = {
           invested_amount?: number
           is_active?: boolean
           loan_amount?: number | null
+          loan_current_balance?: number | null
           loan_interest_rate?: number | null
           loan_monthly_payment?: number | null
           name?: string
