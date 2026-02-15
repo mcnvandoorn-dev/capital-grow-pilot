@@ -19,6 +19,7 @@ export type PrivateInvestment = {
   geography_label: string | null;
   risk_bucket: string | null;
   notes: string | null;
+  monthly_costs: number;
   has_loan: boolean;
   loan_amount: number | null;
   loan_interest_rate: number | null;

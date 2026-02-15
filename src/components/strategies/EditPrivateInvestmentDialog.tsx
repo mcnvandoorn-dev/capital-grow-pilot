@@ -59,6 +59,7 @@ export function EditPrivateInvestmentDialog({
     geography_label: investment.geography_label ?? "",
     risk_bucket: investment.risk_bucket ?? "",
     notes: investment.notes ?? "",
+    monthly_costs: toStr(investment.monthly_costs),
     has_loan: investment.has_loan,
     loan_amount: toStr(investment.loan_amount),
     loan_interest_rate: toStr(investment.loan_interest_rate),
@@ -82,6 +83,7 @@ export function EditPrivateInvestmentDialog({
       geography_label: investment.geography_label ?? "",
       risk_bucket: investment.risk_bucket ?? "",
       notes: investment.notes ?? "",
+      monthly_costs: toStr(investment.monthly_costs),
       has_loan: investment.has_loan,
       loan_amount: toStr(investment.loan_amount),
       loan_interest_rate: toStr(investment.loan_interest_rate),
@@ -115,6 +117,7 @@ export function EditPrivateInvestmentDialog({
         geography_label: form.geography_label || null,
         risk_bucket: form.risk_bucket || null,
         notes: form.notes || null,
+        monthly_costs: form.monthly_costs ? parseFloat(form.monthly_costs) : 0,
         has_loan: form.has_loan,
         loan_amount: form.has_loan && form.loan_amount ? parseFloat(form.loan_amount) : null,
         loan_interest_rate: form.has_loan && form.loan_interest_rate ? parseFloat(form.loan_interest_rate) : null,
@@ -176,11 +179,17 @@ export function EditPrivateInvestmentDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Jaarlijkse cashflow</Label>
               <Input type="number" step="0.01" min="0" value={form.annual_cashflow} onChange={(e) => update("annual_cashflow", e.target.value)} />
             </div>
+            <div className="space-y-1.5">
+              <Label>Maandelijkse kosten</Label>
+              <Input type="number" step="0.01" min="0" value={form.monthly_costs} onChange={(e) => update("monthly_costs", e.target.value)} placeholder="150" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Frequentie</Label>
               <Select value={form.cashflow_frequency} onValueChange={(v) => update("cashflow_frequency", v)}>

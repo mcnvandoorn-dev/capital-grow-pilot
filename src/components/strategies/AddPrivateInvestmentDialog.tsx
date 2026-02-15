@@ -49,6 +49,7 @@ export function AddPrivateInvestmentDialog() {
     geography_label: "",
     risk_bucket: "",
     notes: "",
+    monthly_costs: "",
     has_loan: false,
     loan_amount: "",
     loan_interest_rate: "",
@@ -82,6 +83,7 @@ export function AddPrivateInvestmentDialog() {
         geography_label: form.geography_label || null,
         risk_bucket: form.risk_bucket || null,
         notes: form.notes || null,
+        monthly_costs: form.monthly_costs ? parseFloat(form.monthly_costs) : 0,
         has_loan: form.has_loan,
         loan_amount: form.has_loan && form.loan_amount ? parseFloat(form.loan_amount) : null,
         loan_interest_rate: form.has_loan && form.loan_interest_rate ? parseFloat(form.loan_interest_rate) : null,
@@ -94,7 +96,7 @@ export function AddPrivateInvestmentDialog() {
         name: "", asset_type: "private_equity", invested_amount: "", current_value: "",
         annual_cashflow: "", cashflow_frequency: "annually", expected_growth_pct: "",
         start_date: new Date().toISOString().split("T")[0], exit_horizon: "", currency: "EUR",
-        sector_label: "", geography_label: "", risk_bucket: "", notes: "",
+        sector_label: "", geography_label: "", risk_bucket: "", notes: "", monthly_costs: "",
         has_loan: false, loan_amount: "", loan_interest_rate: "", loan_monthly_payment: "", loan_current_balance: "",
       });
     } catch (err: any) {
@@ -159,11 +161,17 @@ export function AddPrivateInvestmentDialog() {
           </div>
 
           {/* Cashflow */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Jaarlijkse cashflow</Label>
               <Input type="number" step="0.01" min="0" value={form.annual_cashflow} onChange={(e) => update("annual_cashflow", e.target.value)} placeholder="8000" />
             </div>
+            <div className="space-y-1.5">
+              <Label>Maandelijkse kosten</Label>
+              <Input type="number" step="0.01" min="0" value={form.monthly_costs} onChange={(e) => update("monthly_costs", e.target.value)} placeholder="150" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Frequentie</Label>
               <Select value={form.cashflow_frequency} onValueChange={(v) => update("cashflow_frequency", v)}>
