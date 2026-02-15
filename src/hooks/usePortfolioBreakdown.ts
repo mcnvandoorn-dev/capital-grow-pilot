@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { PositionWithDetails } from "@/hooks/usePortfolioData";
+import type { PrivateInvestment } from "@/hooks/usePrivateInvestments";
 
 export interface BreakdownSlice {
   name: string;
@@ -16,6 +17,7 @@ export interface PositionWeight {
   percentage: number;
   sector: string | null;
   currency: string;
+  isPrivate?: boolean;
 }
 
 // Map exchange to region/country (simplified heuristic)
@@ -38,7 +40,6 @@ const EXCHANGE_REGION_MAP: Record<string, { region: string; country: string }> =
 
 function getGeo(exchange: string | null) {
   if (!exchange) return { region: "Onbekend", country: "Onbekend" };
-  // Try exact match then prefix
   const upper = exchange.toUpperCase();
   return (
     EXCHANGE_REGION_MAP[upper] ??
@@ -52,16 +53,39 @@ function getGeo(exchange: string | null) {
 // Income-oriented asset classes
 const DIVIDEND_CLASSES = new Set(["CEF", "BDC", "REIT", "PREFERRED", "BABY_BOND"]);
 
-function buildSlices(
-  positions: PositionWithDetails[],
-  keyFn: (p: PositionWithDetails) => string
+// Private asset types that are income-oriented
+const PRIVATE_INCOME_TYPES = new Set(["real_estate", "vastgoed", "reit", "bonds", "lending"]);
+
+interface GenericSliceItem {
+  value: number;
+  keys: {
+    assetType: string;
+    sector: string;
+    region: string;
+    country: string;
+    currency: string;
+    dividendVsGrowth: string;
+  };
+  weight: {
+    ticker: string;
+    name: string | null;
+    assetClass: string;
+    sector: string | null;
+    currency: string;
+    isPrivate: boolean;
+  };
+}
+
+function buildSlicesFromItems(
+  items: GenericSliceItem[],
+  keyFn: (item: GenericSliceItem) => string
 ): BreakdownSlice[] {
-  const total = positions.reduce((s, p) => s + (p.market_value ?? p.total_cost_basis), 0);
+  const total = items.reduce((s, item) => s + item.value, 0);
   const grouped: Record<string, { value: number; count: number }> = {};
 
-  for (const pos of positions) {
-    const key = keyFn(pos);
-    const val = pos.market_value ?? pos.total_cost_basis;
+  for (const item of items) {
+    const key = keyFn(item);
+    const val = item.value;
     if (!grouped[key]) grouped[key] = { value: 0, count: 0 };
     grouped[key].value += val;
     grouped[key].count += 1;
@@ -77,59 +101,118 @@ function buildSlices(
     .sort((a, b) => b.value - a.value);
 }
 
-export function usePortfolioBreakdown(positions: PositionWithDetails[] | undefined) {
-  const totalValue = useMemo(
-    () => (positions ?? []).reduce((s, p) => s + (p.market_value ?? p.total_cost_basis), 0),
-    [positions]
-  );
+function getPrivateEquity(inv: PrivateInvestment): number {
+  const value = inv.current_value ?? inv.invested_amount;
+  const loan = inv.has_loan ? (inv.loan_current_balance ?? inv.loan_amount ?? 0) : 0;
+  return value - loan;
+}
+
+export function usePortfolioBreakdown(
+  positions: PositionWithDetails[] | undefined,
+  privateInvestments?: PrivateInvestment[]
+) {
+  // Build unified items list
+  const items = useMemo<GenericSliceItem[]>(() => {
+    const result: GenericSliceItem[] = [];
+
+    for (const p of positions ?? []) {
+      const mv = p.market_value ?? p.total_cost_basis;
+      const geo = getGeo(p.security.exchange);
+      result.push({
+        value: mv,
+        keys: {
+          assetType: p.security.asset_class,
+          sector: p.security.sector ?? "Onbekend",
+          region: geo.region,
+          country: geo.country,
+          currency: p.security.currency,
+          dividendVsGrowth: DIVIDEND_CLASSES.has(p.security.asset_class)
+            ? "Dividend/Inkomen"
+            : "Groei/Overig",
+        },
+        weight: {
+          ticker: p.security.ticker,
+          name: p.security.name,
+          assetClass: p.security.asset_class,
+          sector: p.security.sector,
+          currency: p.security.currency,
+          isPrivate: false,
+        },
+      });
+    }
+
+    for (const inv of privateInvestments ?? []) {
+      const equity = getPrivateEquity(inv);
+      if (equity <= 0) continue;
+      const geoLabel = inv.geography_label ?? "Nederland";
+      result.push({
+        value: equity,
+        keys: {
+          assetType: `Privaat: ${inv.asset_type}`,
+          sector: inv.sector_label ?? "Overig",
+          region: geoLabel,
+          country: geoLabel,
+          currency: inv.currency,
+          dividendVsGrowth: PRIVATE_INCOME_TYPES.has(inv.asset_type.toLowerCase())
+            ? "Dividend/Inkomen"
+            : "Groei/Overig",
+        },
+        weight: {
+          ticker: inv.name,
+          name: inv.asset_type,
+          assetClass: `Privaat`,
+          sector: inv.sector_label,
+          currency: inv.currency,
+          isPrivate: true,
+        },
+      });
+    }
+
+    return result;
+  }, [positions, privateInvestments]);
+
+  const totalValue = useMemo(() => items.reduce((s, item) => s + item.value, 0), [items]);
 
   const assetTypeBreakdown = useMemo(
-    () => buildSlices(positions ?? [], (p) => p.security.asset_class),
-    [positions]
+    () => buildSlicesFromItems(items, (i) => i.keys.assetType),
+    [items]
   );
 
   const sectorBreakdown = useMemo(
-    () => buildSlices(positions ?? [], (p) => p.security.sector ?? "Onbekend"),
-    [positions]
+    () => buildSlicesFromItems(items, (i) => i.keys.sector),
+    [items]
   );
 
   const regionBreakdown = useMemo(
-    () => buildSlices(positions ?? [], (p) => getGeo(p.security.exchange).region),
-    [positions]
+    () => buildSlicesFromItems(items, (i) => i.keys.region),
+    [items]
   );
 
   const countryBreakdown = useMemo(
-    () => buildSlices(positions ?? [], (p) => getGeo(p.security.exchange).country),
-    [positions]
+    () => buildSlicesFromItems(items, (i) => i.keys.country),
+    [items]
   );
 
   const currencyBreakdown = useMemo(
-    () => buildSlices(positions ?? [], (p) => p.security.currency),
-    [positions]
+    () => buildSlicesFromItems(items, (i) => i.keys.currency),
+    [items]
   );
 
   const dividendVsGrowth = useMemo(
-    () =>
-      buildSlices(positions ?? [], (p) =>
-        DIVIDEND_CLASSES.has(p.security.asset_class) ? "Dividend/Inkomen" : "Groei/Overig"
-      ),
-    [positions]
+    () => buildSlicesFromItems(items, (i) => i.keys.dividendVsGrowth),
+    [items]
   );
 
   const positionWeights: PositionWeight[] = useMemo(
     () =>
-      (positions ?? [])
-        .map((p) => ({
-          ticker: p.security.ticker,
-          name: p.security.name,
-          assetClass: p.security.asset_class,
-          marketValue: p.market_value ?? p.total_cost_basis,
-          percentage: totalValue > 0 ? ((p.market_value ?? p.total_cost_basis) / totalValue) * 100 : 0,
-          sector: p.security.sector,
-          currency: p.security.currency,
+      items
+        .map((item) => ({
+          ...item.weight,
+          marketValue: item.value,
+          percentage: totalValue > 0 ? (item.value / totalValue) * 100 : 0,
         }))
         .sort((a, b) => b.marketValue - a.marketValue),
-    [positions, totalValue]
+    [items, totalValue]
   );
 
   return {

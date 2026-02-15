@@ -60,9 +60,16 @@ export function PositionWeightsTable({ positions }: PositionWeightsTableProps) {
               </div>
             </TableCell>
             <TableCell>
-              <Badge variant="secondary" className="text-xs">
-                {pos.assetClass}
-              </Badge>
+              <div className="flex items-center gap-1.5">
+                <Badge variant="secondary" className="text-xs">
+                  {pos.assetClass}
+                </Badge>
+                {pos.isPrivate && (
+                  <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+                    Privaat
+                  </Badge>
+                )}
+              </div>
             </TableCell>
             <TableCell className="text-sm text-muted-foreground">
               {pos.sector ?? "—"}
