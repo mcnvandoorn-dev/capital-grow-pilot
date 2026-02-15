@@ -1,11 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Trash2, Building2, DollarSign, TrendingUp, Wallet, PieChart, Lock, Landmark } from "lucide-react";
+import { Trash2, Building2, DollarSign, TrendingUp, Wallet, PieChart, Lock, Landmark, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PrivateInvestment, useDeletePrivateInvestment, usePrivateInvestmentMetrics } from "@/hooks/usePrivateInvestments";
 import { AddPrivateInvestmentDialog } from "./AddPrivateInvestmentDialog";
+import { EditPrivateInvestmentDialog } from "./EditPrivateInvestmentDialog";
 import { toast } from "sonner";
 
 const ASSET_TYPE_LABELS: Record<string, string> = {
@@ -36,6 +37,7 @@ export function PrivateInvestmentsSection({
 }) {
   const deleteMutation = useDeletePrivateInvestment();
   const metrics = usePrivateInvestmentMetrics(investments);
+  const [editingInvestment, setEditingInvestment] = useState<PrivateInvestment | null>(null);
 
   const totalPortfolioValue = publicValue + metrics.totalCurrentValue;
   const privatePct = totalPortfolioValue > 0 ? (metrics.totalCurrentValue / totalPortfolioValue) * 100 : 0;
@@ -308,6 +310,14 @@ export function PrivateInvestmentsSection({
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-primary"
+                          onClick={() => setEditingInvestment(inv)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-7 w-7 text-muted-foreground hover:text-destructive"
                           onClick={() => handleDelete(inv.id, inv.name)}
                         >
@@ -320,6 +330,14 @@ export function PrivateInvestmentsSection({
               </div>
             </CardContent>
           </Card>
+
+          {editingInvestment && (
+            <EditPrivateInvestmentDialog
+              investment={editingInvestment}
+              open={!!editingInvestment}
+              onOpenChange={(open) => { if (!open) setEditingInvestment(null); }}
+            />
+          )}
         </>
       )}
     </div>
