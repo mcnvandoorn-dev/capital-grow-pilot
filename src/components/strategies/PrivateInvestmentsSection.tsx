@@ -123,7 +123,6 @@ export function PrivateInvestmentsSection({
                       <Wallet className="h-4 w-4" /> Netto cashflow/mnd
                     </div>
                     <p className="text-xl font-semibold tabular-nums">{fmt((metrics.totalAnnualCashflow - totalLoanCosts) / 12)}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Bruto: {fmt(metrics.totalAnnualCashflow / 12)}/mnd</p>
                   </CardContent>
                 </Card>
                 <Card className="shadow-sm">
@@ -157,8 +156,7 @@ export function PrivateInvestmentsSection({
                       <th className="text-right py-2 font-medium">Eigen Vermogen</th>
                       <th className="text-right py-2 font-medium">Waarde</th>
                       <th className="text-right py-2 font-medium">ROE</th>
-                      <th className="text-right py-2 font-medium">Cashflow/jr</th>
-                      <th className="text-right py-2 font-medium">Leninglasten/jr</th>
+                      <th className="text-right py-2 font-medium">Netto cashflow/mnd</th>
                       <th className="text-right py-2 font-medium">Netto Yield EV</th>
                     </tr>
                   </thead>
@@ -185,8 +183,7 @@ export function PrivateInvestmentsSection({
                           <td className={cn("py-2 text-right tabular-nums", roe >= 0 ? "text-positive" : "text-negative")}>
                             {inv.current_value != null ? `${roe >= 0 ? "+" : ""}${roe.toFixed(1)}%` : "—"}
                           </td>
-                          <td className="py-2 text-right tabular-nums">{fmt(inv.annual_cashflow)}</td>
-                          <td className="py-2 text-right tabular-nums">{annualLoanCost > 0 ? fmt(-annualLoanCost) : "—"}</td>
+                          <td className="py-2 text-right tabular-nums">{fmt(netCashflow / 12)}</td>
                           <td className={cn("py-2 text-right tabular-nums font-medium", netYieldOnEquity >= 0 ? "text-positive" : "text-negative")}>
                             {equityInvested > 0 ? `${netYieldOnEquity.toFixed(1)}%` : "—"}
                           </td>
@@ -216,8 +213,7 @@ export function PrivateInvestmentsSection({
                             <td className={cn("py-2 text-right tabular-nums", tRoe >= 0 ? "text-positive" : "text-negative")}>
                               {`${tRoe >= 0 ? "+" : ""}${tRoe.toFixed(1)}%`}
                             </td>
-                            <td className="py-2 text-right tabular-nums">{fmt(metrics.totalAnnualCashflow)}</td>
-                            <td className="py-2 text-right tabular-nums">{tLoanCosts > 0 ? fmt(-tLoanCosts) : "—"}</td>
+                            <td className="py-2 text-right tabular-nums">{fmt((metrics.totalAnnualCashflow - tLoanCosts) / 12)}</td>
                             <td className="py-2 text-right tabular-nums font-medium">{`${tNetYield.toFixed(1)}%`}</td>
                           </tr>
                         );
@@ -295,7 +291,6 @@ export function PrivateInvestmentsSection({
                             return monthlyCashflow > 0 ? (
                               <p className="text-xs text-muted-foreground tabular-nums">
                                 {fmt(netMonthly)}/mnd netto
-                                {monthlyLoanCost > 0 && <span className="ml-1">(bruto {fmt(monthlyCashflow)})</span>}
                               </p>
                             ) : null;
                           })()}
