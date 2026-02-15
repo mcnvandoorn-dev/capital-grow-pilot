@@ -645,6 +645,13 @@ export type Database = {
             referencedRelation: "ibkr_connections"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "portfolios_ibkr_connection_id_fkey"
+            columns: ["ibkr_connection_id"]
+            isOneToOne: false
+            referencedRelation: "ibkr_connections_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       positions: {
@@ -1097,6 +1104,13 @@ export type Database = {
             referencedRelation: "ibkr_connections"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "sync_logs_ibkr_connection_id_fkey"
+            columns: ["ibkr_connection_id"]
+            isOneToOne: false
+            referencedRelation: "ibkr_connections_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       trades: {
@@ -1244,7 +1258,42 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      ibkr_connections_safe: {
+        Row: {
+          client_portal_enabled: boolean | null
+          connection_name: string | null
+          created_at: string | null
+          id: string | null
+          last_sync_at: string | null
+          strategy: Database["public"]["Enums"]["investor_strategy"] | null
+          sync_status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          client_portal_enabled?: boolean | null
+          connection_name?: string | null
+          created_at?: string | null
+          id?: string | null
+          last_sync_at?: string | null
+          strategy?: Database["public"]["Enums"]["investor_strategy"] | null
+          sync_status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          client_portal_enabled?: boolean | null
+          connection_name?: string | null
+          created_at?: string | null
+          id?: string | null
+          last_sync_at?: string | null
+          strategy?: Database["public"]["Enums"]["investor_strategy"] | null
+          sync_status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       calculate_security_score: {
