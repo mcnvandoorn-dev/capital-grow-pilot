@@ -84,7 +84,7 @@ export function PrivateInvestmentsSection({
             const totalEquityCurrent = metrics.totalCurrentValue - totalLoanCurrent;
             const roeTotal = totalEquityInvested > 0 ? ((totalEquityCurrent - totalEquityInvested) / totalEquityInvested) * 100 : 0;
             const totalLoanCosts = investments.reduce((s, i) => s + (i.has_loan ? (i.loan_monthly_payment ?? 0) * 12 : 0), 0);
-            const netYieldEV = totalEquityInvested > 0 ? ((metrics.totalAnnualCashflow - totalLoanCosts) / totalEquityInvested) * 100 : 0;
+            const netYieldEV = totalEquityCurrent > 0 ? ((metrics.totalAnnualCashflow - totalLoanCosts) / totalEquityCurrent) * 100 : 0;
 
             return (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -120,10 +120,10 @@ export function PrivateInvestmentsSection({
                 <Card className="shadow-sm">
                   <CardContent className="p-5">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                      <Wallet className="h-4 w-4" /> Private cashflow/jr
+                      <Wallet className="h-4 w-4" /> Netto cashflow/mnd
                     </div>
-                    <p className="text-xl font-semibold tabular-nums">{fmt(metrics.totalAnnualCashflow)}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{privateIncomePct.toFixed(1)}% van totaal income</p>
+                    <p className="text-xl font-semibold tabular-nums">{fmt((metrics.totalAnnualCashflow - totalLoanCosts) / 12)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Bruto: {fmt(metrics.totalAnnualCashflow / 12)}/mnd</p>
                   </CardContent>
                 </Card>
                 <Card className="shadow-sm">
@@ -288,11 +288,17 @@ export function PrivateInvestmentsSection({
                       <div className="flex items-center gap-4 text-right shrink-0">
                         <div>
                           <p className="text-sm tabular-nums font-medium">{fmt(value)}</p>
-                          {inv.annual_cashflow > 0 && (
-                            <p className="text-xs text-muted-foreground tabular-nums">
-                              {fmt(inv.annual_cashflow)}/jr ({FREQ_LABELS[inv.cashflow_frequency] ?? inv.cashflow_frequency})
-                            </p>
-                          )}
+                          {(() => {
+                            const monthlyCashflow = inv.annual_cashflow / 12;
+                            const monthlyLoanCost = inv.has_loan ? (inv.loan_monthly_payment ?? 0) : 0;
+                            const netMonthly = monthlyCashflow - monthlyLoanCost;
+                            return monthlyCashflow > 0 ? (
+                              <p className="text-xs text-muted-foreground tabular-nums">
+                                {fmt(netMonthly)}/mnd netto
+                                {monthlyLoanCost > 0 && <span className="ml-1">(bruto {fmt(monthlyCashflow)})</span>}
+                              </p>
+                            ) : null;
+                          })()}
                         </div>
                         <span className={cn("text-xs tabular-nums w-16 text-right", pnl >= 0 ? "text-positive" : "text-negative")}>
                           {inv.current_value != null ? `${pnl >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%` : "—"}
