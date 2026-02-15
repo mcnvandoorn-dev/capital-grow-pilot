@@ -103,6 +103,8 @@ export function usePrivateInvestmentMetrics(investments?: PrivateInvestment[]) {
   const items = investments ?? [];
   const totalInvested = items.reduce((s, i) => s + i.invested_amount, 0);
   const totalCurrentValue = items.reduce((s, i) => s + (i.current_value ?? i.invested_amount), 0);
+  const totalLoanBalance = items.reduce((s, i) => s + (i.has_loan ? (i.loan_current_balance ?? i.loan_amount ?? 0) : 0), 0);
+  const totalEquity = totalCurrentValue - totalLoanBalance;
   const totalAnnualCashflow = items.reduce((s, i) => s + i.annual_cashflow, 0);
   const unrealizedPnl = totalCurrentValue - totalInvested;
   const unrealizedPnlPct = totalInvested > 0 ? (unrealizedPnl / totalInvested) * 100 : 0;
@@ -139,6 +141,8 @@ export function usePrivateInvestmentMetrics(investments?: PrivateInvestment[]) {
   return {
     totalInvested,
     totalCurrentValue,
+    totalLoanBalance,
+    totalEquity,
     totalAnnualCashflow,
     unrealizedPnl,
     unrealizedPnlPct,
