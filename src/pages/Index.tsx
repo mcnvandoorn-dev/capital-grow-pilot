@@ -25,6 +25,7 @@ import {
 import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { usePrivateInvestments, usePrivateInvestmentMetrics } from "@/hooks/usePrivateInvestments";
 
 function formatAmount(value: number, currency: "EUR" | "USD") {
   return new Intl.NumberFormat("nl-NL", {
@@ -39,7 +40,6 @@ function useEurToUsd() {
   return useQuery({
     queryKey: ["eur-to-usd-rate"],
     queryFn: async () => {
-      // Get USD→EUR rate from fx_rates, invert it
       const { data } = await supabase
         .from("fx_rates")
         .select("rate")
@@ -48,7 +48,6 @@ function useEurToUsd() {
         .order("rate_date", { ascending: false })
         .limit(1)
         .maybeSingle();
-      // If USD→EUR rate exists, EUR→USD = 1/rate
       return data?.rate ? 1 / data.rate : 1;
     },
   });
@@ -70,11 +69,15 @@ const Index = () => {
     usePositions(portfolioIds);
   const { data: dividendsYTD } = useDividendsYTD(portfolioIds);
 
-  const isLoading = loadingPortfolios || loadingPositions;
-  const hasPositions = (positions?.length ?? 0) > 0;
+  // Private investments
+  const { data: privateInvestments } = usePrivateInvestments();
+  const privateMetrics = usePrivateInvestmentMetrics(privateInvestments ?? undefined);
 
-  // Calculate KPIs
-  const totalValue = useMemo(
+  const isLoading = loadingPortfolios || loadingPositions;
+  const hasPositions = (positions?.length ?? 0) > 0 || (privateInvestments?.length ?? 0) > 0;
+
+  // Calculate KPIs — Portfolio = publiek + privaat
+  const publicValue = useMemo(
     () =>
       (positions ?? []).reduce(
         (sum, p) => sum + (p.market_value ?? p.total_cost_basis),
@@ -83,21 +86,38 @@ const Index = () => {
     [positions]
   );
 
-  const totalPnl = useMemo(
+  const publicPnl = useMemo(
     () =>
       (positions ?? []).reduce((sum, p) => sum + (p.unrealized_pnl ?? 0), 0),
     [positions]
   );
 
-  const totalCost = useMemo(
+  const publicCost = useMemo(
     () => (positions ?? []).reduce((sum, p) => sum + p.total_cost_basis, 0),
     [positions]
   );
 
+  // Private netto maandelijkse cashflow
+  const privateMonthlyCosts = useMemo(() => {
+    const items = privateInvestments ?? [];
+    const totalLoanCosts = items.reduce((s, i) => s + (i.has_loan ? (i.loan_monthly_payment ?? 0) : 0), 0);
+    const totalMonthlyCosts = items.reduce((s, i) => s + (i.monthly_costs ?? 0), 0);
+    return totalLoanCosts + totalMonthlyCosts;
+  }, [privateInvestments]);
+
+  // Totalen: publiek + privaat
+  const totalValue = publicValue + privateMetrics.totalCurrentValue;
+  const totalPnl = publicPnl + privateMetrics.unrealizedPnl;
+  const totalCost = publicCost + privateMetrics.totalInvested;
   const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
 
+  // Netto maandelijkse cashflow (privaat) + dividend YTD (publiek)
+  const nettoMonthlyCashflow = (privateMetrics.totalAnnualCashflow / 12) - privateMonthlyCosts;
+
+  const positionCount = (positions?.length ?? 0) + (privateInvestments?.length ?? 0);
+
   return (
-    <AppLayout title="Portfolio" subtitle="Overzicht van je beleggingen" actions={<CurrencyToggle />}>
+    <AppLayout title="Portfolio" subtitle="Overzicht van al je strategieën samen" actions={<CurrencyToggle />}>
       {/* KPI row */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         {isLoading ? (
@@ -116,6 +136,7 @@ const Index = () => {
             <KpiCard
               label="Totale waarde"
               value={fmt(totalValue)}
+              subtitle={`Publiek: ${fmt(publicValue)} · Privaat: ${fmt(privateMetrics.totalCurrentValue)}`}
               icon={DollarSign}
             />
             <KpiCard
@@ -132,13 +153,15 @@ const Index = () => {
               icon={TrendingUp}
             />
             <KpiCard
-              label="Dividend YTD"
+              label="Dividend YTD + Netto cashflow/mnd"
               value={fmt(dividendsYTD ?? 0)}
+              subtitle={`Privaat netto: ${fmt(nettoMonthlyCashflow)}/mnd`}
               icon={Wallet}
             />
             <KpiCard
               label="Posities"
-              value={String(positions?.length ?? 0)}
+              value={String(positionCount)}
+              subtitle={`${positions?.length ?? 0} publiek · ${privateInvestments?.length ?? 0} privaat`}
               icon={PieChart}
             />
           </>
@@ -160,7 +183,7 @@ const Index = () => {
                 ))}
               </div>
             ) : hasPositions ? (
-              <HoldingsTable positions={positions!} />
+              <HoldingsTable positions={positions ?? []} />
             ) : (
               <EmptyState
                 icon={LayoutDashboard}
@@ -184,7 +207,7 @@ const Index = () => {
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-[180px] w-full rounded-lg" />
-            ) : hasPositions ? (
+            ) : (positions?.length ?? 0) > 0 ? (
               <AllocationChart positions={positions!} />
             ) : (
               <EmptyState

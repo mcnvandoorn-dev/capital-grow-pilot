@@ -2,15 +2,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 
-interface KpiCardProps {
+export interface KpiCardProps {
   label: string;
   value: string;
   change?: string;
   changeType?: "positive" | "negative" | "neutral";
   icon?: LucideIcon;
+  subtitle?: string;
 }
 
-export function KpiCard({ label, value, change, changeType = "neutral", icon: Icon }: KpiCardProps) {
+export function KpiCard({ label, value, change, changeType = "neutral", icon: Icon, subtitle }: KpiCardProps) {
   return (
     <Card className="shadow-sm">
       <CardContent className="p-5">
@@ -29,6 +30,9 @@ export function KpiCard({ label, value, change, changeType = "neutral", icon: Ic
               >
                 {change}
               </p>
+            )}
+            {subtitle && (
+              <p className="text-xs text-muted-foreground">{subtitle}</p>
             )}
           </div>
           {Icon && (
