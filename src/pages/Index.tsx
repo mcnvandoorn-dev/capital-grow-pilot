@@ -149,8 +149,8 @@ const Index = () => {
     return totalLoanCosts + totalMonthlyCosts;
   }, [privateInvestments]);
 
-  // Totalen: publiek + privaat
-  const totalValue = publicValue + privateMetrics.totalCurrentValue;
+  // Totalen: publiek + privaat (privaat = equity, dus waarde minus leningen)
+  const totalValue = publicValue + privateMetrics.totalEquity;
   const totalPnl = publicPnl + privateMetrics.unrealizedPnl;
   const totalCost = publicCost + privateMetrics.totalInvested;
   const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
@@ -197,7 +197,7 @@ const Index = () => {
             <KpiCard
               label="Totale waarde"
               value={fmt(totalValue)}
-              subtitle={`Publiek: ${fmt(publicValue)} · Privaat: ${fmt(privateMetrics.totalCurrentValue)}`}
+              subtitle={`Publiek: ${fmt(publicValue)} · Privaat: ${fmt(privateMetrics.totalEquity)}`}
               icon={DollarSign}
             />
             <KpiCard
