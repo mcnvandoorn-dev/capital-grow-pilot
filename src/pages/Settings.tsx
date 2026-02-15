@@ -38,6 +38,18 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+type IbkrConnectionSafe = {
+  id: string;
+  user_id: string;
+  connection_name: string;
+  client_portal_enabled: boolean;
+  last_sync_at: string | null;
+  sync_status: string | null;
+  strategy: string;
+  created_at: string;
+  updated_at: string;
+};
+
 const STRATEGY_LABELS: Record<string, string> = {
   BUY_AND_HOLD: "Buy & Hold",
   DIVIDEND_GROWTH: "Dividend Growth",
@@ -62,11 +74,11 @@ const SettingsPage = () => {
     queryKey: ["ibkr-connections", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("ibkr_connections")
+        .from("ibkr_connections_safe" as any)
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as unknown as IbkrConnectionSafe[];
     },
     enabled: !!user,
   });
@@ -323,10 +335,9 @@ const SettingsPage = () => {
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Query ID: {conn.flex_query_id || "—"}
                       {conn.last_sync_at && (
                         <>
-                          {" · "}Laatst gesynchroniseerd:{" "}
+                          Laatst gesynchroniseerd:{" "}
                           {new Date(conn.last_sync_at).toLocaleDateString("nl-NL", {
                             day: "numeric",
                             month: "short",
