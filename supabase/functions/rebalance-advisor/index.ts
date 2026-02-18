@@ -36,7 +36,8 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const prompt = `Je bent een ervaren portfolioadviseur voor dividendbeleggers. Analyseer de portefeuille en genereer een herbalanceervoorstel.
+    const assetMix = preferences.assetMixTarget ?? {};
+    const prompt = `Je bent een ervaren portfolioadviseur voor dividendbeleggers. Analyseer de VOLLEDIGE portefeuille (publieke beurs + private investeringen) en genereer een herbalanceervoorstel.
 
 ## Gebruikersvoorkeuren
 - Primair doel: ${preferences.primaryGoal}
@@ -45,11 +46,30 @@ serve(async (req) => {
 - Gewenste sectoren: ${preferences.targetSectors.join(", ")}
 - Gewenste regio's: ${preferences.targetRegions.join(", ")}
 - Gewenste yield range: ${preferences.targetYieldMin}% - ${preferences.targetYieldMax}%
+- Gewenste asset allocatie (doelstelling):
+  * Aandelen/ETF/CEF/BDC: ${assetMix.equity ?? "?"}%
+  * Credit/Obligaties/Preferreds/Baby Bonds: ${assetMix.credit ?? "?"}%
+  * Vastgoed/REIT: ${assetMix.realEstate ?? "?"}%
+  * Private investeringen: ${assetMix.privateAssets ?? "?"}%
+  * Cash: ${assetMix.cash ?? "?"}%
 
-## Huidige Portefeuille
-### Posities
-${JSON.stringify(portfolio.positions, null, 2)}
+## Portfolio Overzicht
+- Totale portfolio waarde: €${(portfolio.totalPortfolioValue ?? 0).toLocaleString("nl-NL", { maximumFractionDigits: 0 })}
+- Aantal portfolios: ${(portfolio.portfolios ?? []).length}
+- Portfolios: ${(portfolio.portfolios ?? []).map((p: any) => `${p.name} (${p.strategy})`).join(", ")}
 
+## Publieke Posities (beurs)
+${JSON.stringify(portfolio.positions?.filter((p: any) => !p.isPrivate), null, 2)}
+
+## Private Investeringen
+${JSON.stringify(portfolio.privateInvestments ?? [], null, 2)}
+
+### Private Metrics
+- Netto eigen vermogen privaat: €${(portfolio.privateMetrics?.totalEquity ?? 0).toLocaleString("nl-NL", { maximumFractionDigits: 0 })}
+- Jaarlijkse cashflow privaat: €${(portfolio.privateMetrics?.totalAnnualCashflow ?? 0).toLocaleString("nl-NL", { maximumFractionDigits: 0 })}
+- Gewicht privaat in totale portfolio: ${(portfolio.privateMetrics?.privateWeightPct ?? 0).toFixed(1)}%
+
+## Gecombineerde Breakdowns (publiek + privaat)
 ### Sectorverdeling
 ${JSON.stringify(portfolio.sectorBreakdown, null, 2)}
 
@@ -63,6 +83,8 @@ ${JSON.stringify(portfolio.regionBreakdown, null, 2)}
 ${JSON.stringify(portfolio.currencyBreakdown, null, 2)}
 
 ## Instructies
+Analyseer ZOWEL de publieke als private portefeuille als een geïntegreerd geheel. Vergelijk de HUIDIGE asset allocatie met de GEWENSTE allocatie van de gebruiker en identificeer afwijkingen. Private investeringen zijn illiquide dus wees realistisch in aanbevelingen (je kunt private assets niet zomaar verkopen).
+
 Genereer een gestructureerd herbalanceervoorstel. Je MOET antwoorden als een VALID JSON object met exact deze structuur (geen markdown, geen code blocks, alleen puur JSON):
 
 {

@@ -14,6 +14,7 @@ import {
 import { RebalanceHistory } from "@/components/rebalancing/RebalanceHistory";
 import { usePortfolios, usePositions } from "@/hooks/usePortfolioData";
 import { usePortfolioBreakdown } from "@/hooks/usePortfolioBreakdown";
+import { usePrivateInvestments, usePrivateInvestmentMetrics } from "@/hooks/usePrivateInvestments";
 import { useSaveRebalanceProposal } from "@/hooks/useRebalanceHistory";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -22,22 +23,31 @@ import { Scale, RotateCcw } from "lucide-react";
 export default function RebalancingAdvisor() {
   const { toast } = useToast();
   const saveProposal = useSaveRebalanceProposal();
+
+  // All portfolios (public)
   const { data: portfolios, isLoading: loadingPortfolios } = usePortfolios();
   const portfolioIds = useMemo(
     () => (portfolios ?? []).map((p) => p.id),
     [portfolios]
   );
   const { data: positions, isLoading: loadingPositions } = usePositions(portfolioIds);
+
+  // Private investments
+  const { data: privateInvestments, isLoading: loadingPrivate } = usePrivateInvestments();
+  const privateMetrics = usePrivateInvestmentMetrics(privateInvestments ?? []);
+
+  // Portfolio breakdown — now includes private investments
   const {
     assetTypeBreakdown,
     sectorBreakdown,
     regionBreakdown,
     currencyBreakdown,
     positionWeights,
-  } = usePortfolioBreakdown(positions ?? undefined);
+    totalValue,
+  } = usePortfolioBreakdown(positions ?? undefined, privateInvestments ?? undefined);
 
-  const isLoading = loadingPortfolios || loadingPositions;
-  const hasPositions = (positions?.length ?? 0) > 0;
+  const isLoading = loadingPortfolios || loadingPositions || loadingPrivate;
+  const hasPositions = (positions?.length ?? 0) > 0 || (privateInvestments?.length ?? 0) > 0;
 
   const [proposal, setProposal] = useState<RebalanceProposal | null>(null);
   const [lastPrefs, setLastPrefs] = useState<RebalancePreferences | null>(null);
@@ -48,11 +58,35 @@ export default function RebalancingAdvisor() {
     setAnalyzing(true);
     setLastPrefs(prefs);
     try {
+      // Build private investments summary for AI
+      const privateSummary = (privateInvestments ?? []).map((inv) => {
+        const equity = (inv.current_value ?? inv.invested_amount) - (inv.has_loan ? (inv.loan_current_balance ?? inv.loan_amount ?? 0) : 0);
+        return {
+          name: inv.name,
+          assetType: inv.asset_type,
+          sector: inv.sector_label,
+          geography: inv.geography_label,
+          currency: inv.currency,
+          netEquity: equity,
+          annualCashflow: inv.annual_cashflow,
+          hasLoan: inv.has_loan,
+          riskBucket: inv.risk_bucket,
+        };
+      });
+
+      // Build portfolios context for AI
+      const portfolioContext = (portfolios ?? []).map((p) => ({
+        name: p.name,
+        strategy: p.strategy,
+        baseCurrency: p.base_currency,
+      }));
+
       const { data, error } = await supabase.functions.invoke("rebalance-advisor", {
         body: {
           preferences: prefs,
           portfolio: {
-            positions: positionWeights.slice(0, 30).map((p) => ({
+            // Public positions (max 40, sorted by weight)
+            positions: positionWeights.slice(0, 40).map((p) => ({
               ticker: p.ticker,
               name: p.name,
               assetClass: p.assetClass,
@@ -60,7 +94,9 @@ export default function RebalancingAdvisor() {
               currency: p.currency,
               weight: p.percentage,
               marketValue: p.marketValue,
+              isPrivate: p.isPrivate ?? false,
             })),
+            // Combined breakdowns (public + private)
             sectorBreakdown: sectorBreakdown.map((s) => ({
               sector: s.name,
               weight: s.percentage,
@@ -79,6 +115,17 @@ export default function RebalancingAdvisor() {
               currency: c.name,
               weight: c.percentage,
             })),
+            // Private investments detail
+            privateInvestments: privateSummary,
+            privateMetrics: {
+              totalEquity: privateMetrics.totalEquity,
+              totalAnnualCashflow: privateMetrics.totalAnnualCashflow,
+              count: privateMetrics.count,
+              privateWeightPct: totalValue > 0 ? (privateMetrics.totalEquity / totalValue) * 100 : 0,
+            },
+            // Portfolio info
+            portfolios: portfolioContext,
+            totalPortfolioValue: totalValue,
           },
         },
       });
@@ -163,4 +210,3 @@ export default function RebalancingAdvisor() {
     </AppLayout>
   );
 }
-
