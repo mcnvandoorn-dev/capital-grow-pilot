@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import { AllocationChart } from "@/components/dashboard/AllocationChart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, RefreshCw, Sprout, DollarSign, Wallet, Building2 } from "lucide-react";
+import { TrendingUp, RefreshCw, Sprout, DollarSign, Euro, Wallet, Building2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -124,6 +124,7 @@ const Strategies = () => {
             positionsByPortfolio={positionsByPortfolio}
             dividendsYTD={divBuyHold ?? 0}
             fmt={fmt}
+            currency={currency}
             emptyDescription="Geen portfolio's met de Buy & Hold strategie."
           />
         </TabsContent>
@@ -136,6 +137,7 @@ const Strategies = () => {
             positionsByPortfolio={positionsByPortfolio}
             dividendsYTD={divDividend ?? 0}
             fmt={fmt}
+            currency={currency}
             emptyDescription="Geen portfolio's met de Dividend Growth strategie."
           />
         </TabsContent>
@@ -148,6 +150,7 @@ const Strategies = () => {
             positionsByPortfolio={positionsByPortfolio}
             dividendsYTD={divWcg ?? 0}
             fmt={fmt}
+            currency={currency}
             emptyDescription="Geen portfolio's met de Working Capital Growth strategie."
           />
         </TabsContent>
@@ -171,6 +174,7 @@ function StrategySection({
   positionsByPortfolio,
   dividendsYTD,
   fmt,
+  currency,
   emptyDescription,
 }: {
   icon: any;
@@ -179,6 +183,7 @@ function StrategySection({
   positionsByPortfolio: Map<string, any[]>;
   dividendsYTD: number;
   fmt: (v: number) => string;
+  currency: "EUR" | "USD";
   emptyDescription: string;
 }) {
   // Aggregate all positions across portfolios in this strategy
@@ -226,7 +231,7 @@ function StrategySection({
         <Card className="shadow-sm">
           <CardContent className="p-5">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-              <DollarSign className="h-4 w-4" /> Totale waarde
+              {currency === "EUR" ? <Euro className="h-4 w-4" /> : <DollarSign className="h-4 w-4" />} Totale waarde
             </div>
             <p className="text-xl font-semibold tabular-nums">{fmt(totalValue)}</p>
           </CardContent>
