@@ -8,6 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight } from "lucide-react";
 
+export interface AssetMixTarget {
+  equity: number;       // aandelen / ETF / CEF / BDC
+  credit: number;       // obligaties / preferreds / baby bonds
+  realEstate: number;   // REIT / vastgoed
+  privateAssets: number; // private investeringen
+  cash: number;         // cash
+}
+
 export interface RebalancePreferences {
   primaryGoal: string;
   investmentStyle: string;
@@ -16,6 +24,7 @@ export interface RebalancePreferences {
   targetRegions: string[];
   targetYieldMin: number;
   targetYieldMax: number;
+  assetMixTarget: AssetMixTarget;
 }
 
 const SECTORS = [
@@ -26,6 +35,29 @@ const SECTORS = [
 
 const REGIONS = [
   "Noord-Amerika", "Europa", "Azië-Pacific", "Emerging Markets", "Globaal",
+];
+
+const ASSET_MIX_PRESETS = [
+  {
+    label: "Dividend-gedreven",
+    desc: "Hoog inkomen, weinig equity groei",
+    mix: { equity: 20, credit: 30, realEstate: 30, privateAssets: 15, cash: 5 },
+  },
+  {
+    label: "Gebalanceerd",
+    desc: "Mix van inkomen en groei",
+    mix: { equity: 40, credit: 20, realEstate: 20, privateAssets: 15, cash: 5 },
+  },
+  {
+    label: "Groei",
+    desc: "Focus op kapitaalgroei",
+    mix: { equity: 60, credit: 10, realEstate: 15, privateAssets: 10, cash: 5 },
+  },
+  {
+    label: "Conservatief",
+    desc: "Laag risico, stabiele cashflow",
+    mix: { equity: 15, credit: 40, realEstate: 20, privateAssets: 15, cash: 10 },
+  },
 ];
 
 interface QuestionnaireProps {
@@ -43,21 +75,34 @@ export function RebalanceQuestionnaire({ onSubmit, isLoading }: QuestionnairePro
     targetRegions: [],
     targetYieldMin: 4,
     targetYieldMax: 10,
+    assetMixTarget: { equity: 40, credit: 20, realEstate: 20, privateAssets: 15, cash: 5 },
   });
 
   const toggleItem = (list: string[], item: string) =>
     list.includes(item) ? list.filter((i) => i !== item) : [...list, item];
 
+  const mixTotal = Object.values(prefs.assetMixTarget).reduce((s, v) => s + v, 0);
+  const mixValid = mixTotal === 100;
+
   const canAdvance = () => {
     switch (step) {
       case 0: return !!prefs.primaryGoal;
       case 1: return !!prefs.investmentStyle;
-      case 2: return true; // slider always has value
-      case 3: return prefs.targetSectors.length > 0;
-      case 4: return prefs.targetRegions.length > 0;
-      case 5: return prefs.targetYieldMin < prefs.targetYieldMax;
+      case 2: return true;
+      case 3: return mixValid;
+      case 4: return prefs.targetSectors.length > 0;
+      case 5: return prefs.targetRegions.length > 0;
+      case 6: return prefs.targetYieldMin < prefs.targetYieldMax;
       default: return false;
     }
+  };
+
+  const updateMix = (key: keyof AssetMixTarget, value: number) => {
+    setPrefs((p) => ({ ...p, assetMixTarget: { ...p.assetMixTarget, [key]: value } }));
+  };
+
+  const applyPreset = (mix: AssetMixTarget) => {
+    setPrefs((p) => ({ ...p, assetMixTarget: mix }));
   };
 
   const steps = [
@@ -155,7 +200,85 @@ export function RebalanceQuestionnaire({ onSubmit, isLoading }: QuestionnairePro
       </CardContent>
     </Card>,
 
-    // Step 3: Target sectors
+    // Step 3: Asset mix target (NEW)
+    <Card key="assetmix" className="shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-medium">
+          Wat is je gewenste asset allocatie?
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Stel de ideale verdeling in over alle asset categorieën. Totaal moet 100% zijn.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {/* Presets */}
+        <div className="flex flex-wrap gap-2">
+          {ASSET_MIX_PRESETS.map((preset) => (
+            <Badge
+              key={preset.label}
+              variant="outline"
+              className="cursor-pointer text-xs py-1.5 px-3 hover:bg-primary hover:text-primary-foreground transition-colors"
+              onClick={() => applyPreset(preset.mix)}
+            >
+              {preset.label}
+            </Badge>
+          ))}
+        </div>
+
+        {/* Sliders */}
+        <div className="space-y-4">
+          {(
+            [
+              { key: "equity" as const, label: "Aandelen / ETF / CEF / BDC", color: "bg-blue-500" },
+              { key: "credit" as const, label: "Credit / Obligaties / Preferreds / Baby Bonds", color: "bg-amber-500" },
+              { key: "realEstate" as const, label: "Vastgoed / REIT", color: "bg-emerald-500" },
+              { key: "privateAssets" as const, label: "Private investeringen", color: "bg-purple-500" },
+              { key: "cash" as const, label: "Cash / Liquide middelen", color: "bg-slate-400" },
+            ] as const
+          ).map(({ key, label, color }) => (
+            <div key={key} className="space-y-1.5">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2.5 h-2.5 rounded-full ${color}`} />
+                  <Label className="text-sm">{label}</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={prefs.assetMixTarget[key]}
+                    onChange={(e) => updateMix(key, parseInt(e.target.value) || 0)}
+                    className="w-16 h-7 text-xs text-center"
+                  />
+                  <span className="text-xs text-muted-foreground w-4">%</span>
+                </div>
+              </div>
+              <Slider
+                value={[prefs.assetMixTarget[key]]}
+                onValueChange={([v]) => updateMix(key, v)}
+                min={0}
+                max={100}
+                step={5}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Total indicator */}
+        <div className={`flex items-center justify-between rounded-lg p-3 text-sm font-medium ${
+          mixTotal === 100
+            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+            : "bg-destructive/10 text-destructive"
+        }`}>
+          <span>Totaal</span>
+          <span>{mixTotal}% {mixTotal === 100 ? "✓" : `(${mixTotal > 100 ? "+" : ""}${mixTotal - 100}%)`}</span>
+        </div>
+      </CardContent>
+    </Card>,
+
+    // Step 4: Target sectors
     <Card key="sectors" className="shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-medium">
@@ -181,7 +304,7 @@ export function RebalanceQuestionnaire({ onSubmit, isLoading }: QuestionnairePro
       </CardContent>
     </Card>,
 
-    // Step 4: Target regions
+    // Step 5: Target regions
     <Card key="regions" className="shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-medium">
@@ -207,7 +330,7 @@ export function RebalanceQuestionnaire({ onSubmit, isLoading }: QuestionnairePro
       </CardContent>
     </Card>,
 
-    // Step 5: Target yield range
+    // Step 6: Target yield range
     <Card key="yield" className="shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-medium">
