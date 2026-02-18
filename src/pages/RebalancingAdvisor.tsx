@@ -11,14 +11,17 @@ import {
   RebalanceResults,
   type RebalanceProposal,
 } from "@/components/rebalancing/RebalanceResults";
+import { RebalanceHistory } from "@/components/rebalancing/RebalanceHistory";
 import { usePortfolios, usePositions } from "@/hooks/usePortfolioData";
 import { usePortfolioBreakdown } from "@/hooks/usePortfolioBreakdown";
+import { useSaveRebalanceProposal } from "@/hooks/useRebalanceHistory";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Scale, RotateCcw } from "lucide-react";
 
 export default function RebalancingAdvisor() {
   const { toast } = useToast();
+  const saveProposal = useSaveRebalanceProposal();
   const { data: portfolios, isLoading: loadingPortfolios } = usePortfolios();
   const portfolioIds = useMemo(
     () => (portfolios ?? []).map((p) => p.id),
@@ -37,11 +40,13 @@ export default function RebalancingAdvisor() {
   const hasPositions = (positions?.length ?? 0) > 0;
 
   const [proposal, setProposal] = useState<RebalanceProposal | null>(null);
+  const [lastPrefs, setLastPrefs] = useState<RebalancePreferences | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [showQuestionnaire, setShowQuestionnaire] = useState(true);
 
   const handleSubmit = async (prefs: RebalancePreferences) => {
     setAnalyzing(true);
+    setLastPrefs(prefs);
     try {
       const { data, error } = await supabase.functions.invoke("rebalance-advisor", {
         body: {
@@ -83,6 +88,9 @@ export default function RebalancingAdvisor() {
 
       setProposal(data.proposal);
       setShowQuestionnaire(false);
+
+      // Persist to history
+      saveProposal.mutate({ preferences: prefs, proposal: data.proposal });
     } catch (e: any) {
       console.error("Rebalance error:", e);
       toast({
@@ -149,6 +157,10 @@ export default function RebalancingAdvisor() {
       )}
 
       {proposal && <RebalanceResults proposal={proposal} />}
+
+      {/* Previous advices – always visible below the questionnaire/results */}
+      {!analyzing && <RebalanceHistory />}
     </AppLayout>
   );
 }
+
