@@ -10,7 +10,8 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Link, RefreshCw, Plus, Trash2, FolderOpen, History } from "lucide-react";
+import { Settings, Link, RefreshCw, Plus, Trash2, FolderOpen, History, BookOpen } from "lucide-react";
+import { downloadFlexQueryTutorialPdf } from "@/lib/flexQueryTutorialPdf";
 import {
   Dialog,
   DialogContent,
@@ -227,6 +228,25 @@ const SettingsPage = () => {
 
   return (
     <AppLayout title="Instellingen" subtitle="Beheer je koppelingen en portfolio's">
+      {/* Tutorial banner */}
+      <Card className="shadow-sm max-w-2xl mb-6 border-dashed">
+        <CardContent className="flex items-center justify-between py-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">Handleiding: Flex Query instellen</p>
+              <p className="text-xs text-muted-foreground">Stap-voor-stap uitleg om je IBKR account te koppelen inclusief benodigde velden.</p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={downloadFlexQueryTutorialPdf}>
+            <BookOpen className="mr-1.5 h-3.5 w-3.5" />
+            Download handleiding
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* IBKR Connections */}
       <Card className="shadow-sm max-w-2xl mb-6">
         <CardHeader className="flex flex-row items-center justify-between pb-3">
