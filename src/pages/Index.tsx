@@ -11,6 +11,7 @@ import { CurrencyToggle } from "@/components/dashboard/CurrencyToggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DollarSign,
+  Euro,
   TrendingUp,
   PieChart,
   Wallet,
@@ -198,7 +199,7 @@ const Index = () => {
               label="Totale waarde"
               value={fmt(totalValue)}
               subtitle={`Publiek: ${fmt(publicValue)} · Privaat: ${fmt(privateMetrics.totalEquity)}`}
-              icon={DollarSign}
+              icon={currency === "EUR" ? Euro : DollarSign}
             />
             <KpiCard
               label="Ongerealiseerd P/L"
