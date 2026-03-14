@@ -118,7 +118,7 @@ export default function DividendCalendar() {
   const monthKeys = useMemo(() => Array.from(byMonth.keys()).sort(), [byMonth]);
 
   return (
-    <AppLayout>
+    <AppLayout title="Dividend Kalender" subtitle="Verwachte ex-dates en pay-dates">
       <div className="space-y-6">
         {/* Header */}
         <div>

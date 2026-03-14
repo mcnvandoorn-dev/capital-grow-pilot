@@ -40,6 +40,7 @@ const App = () => (
             <Route path="/portfolio-breakdown" element={<ProtectedRoute><PortfolioBreakdown /></ProtectedRoute>} />
             <Route path="/ticker-deep-dive" element={<ProtectedRoute><TickerDeepDive /></ProtectedRoute>} />
             <Route path="/rebalancing-advisor" element={<ProtectedRoute><RebalancingAdvisor /></ProtectedRoute>} />
+            <Route path="/dividend-calendar" element={<ProtectedRoute><DividendCalendar /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           </CurrencyProvider>

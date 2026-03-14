@@ -36,6 +36,7 @@ const analysisNav = [
   { title: "Portfolio Breakdown", url: "/portfolio-breakdown", icon: PieChart },
   { title: "Ticker Deep Dive", url: "/ticker-deep-dive", icon: Search },
   { title: "Rebalancing Advisor", url: "/rebalancing-advisor", icon: Scale },
+  { title: "Dividend Kalender", url: "/dividend-calendar", icon: CalendarDays },
 ];
 
 const secondaryNav = [
