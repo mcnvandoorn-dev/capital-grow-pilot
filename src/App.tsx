@@ -16,6 +16,7 @@ import Alerts from "./pages/Alerts";
 import PortfolioBreakdown from "./pages/PortfolioBreakdown";
 import TickerDeepDive from "./pages/TickerDeepDive";
 import RebalancingAdvisor from "./pages/RebalancingAdvisor";
+import DividendCalendar from "./pages/DividendCalendar";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/portfolio-breakdown" element={<ProtectedRoute><PortfolioBreakdown /></ProtectedRoute>} />
             <Route path="/ticker-deep-dive" element={<ProtectedRoute><TickerDeepDive /></ProtectedRoute>} />
             <Route path="/rebalancing-advisor" element={<ProtectedRoute><RebalancingAdvisor /></ProtectedRoute>} />
+            <Route path="/dividend-calendar" element={<ProtectedRoute><DividendCalendar /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           </CurrencyProvider>
