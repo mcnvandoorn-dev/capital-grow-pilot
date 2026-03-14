@@ -218,7 +218,7 @@ const Index = () => {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6 mb-6">
         {isLoading ? (
           <>
-            {Array.from({ length: 5 }).map((_, i) => (
+            {Array.from({ length: 6 }).map((_, i) => (
               <Card key={i} className="shadow-sm">
                 <CardContent className="p-5">
                   <Skeleton className="h-4 w-20 mb-2" />
