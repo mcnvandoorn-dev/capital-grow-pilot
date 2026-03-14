@@ -215,7 +215,7 @@ const Index = () => {
   return (
     <AppLayout title="Portfolio" subtitle="Overzicht van al je strategieën samen" actions={<CurrencyToggle />}>
       {/* KPI row */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6 mb-6">
         {isLoading ? (
           <>
             {Array.from({ length: 5 }).map((_, i) => (
