@@ -150,9 +150,9 @@ export function useDividendCalendar() {
           name: sec.name,
           expectedExDate: exDateStr,
           expectedPayDate: payDate.toISOString().split("T")[0],
-          amountPerShare: latest.amount_per_share,
+          amountPerShare: derivedAmountPerShare,
           quantity: pos.quantity,
-          estimatedTotal: latest.amount_per_share * pos.quantity,
+          estimatedTotal: derivedAmountPerShare * pos.quantity,
           frequency: sec.dividend_frequency ?? "quarterly",
           confidence,
         });
