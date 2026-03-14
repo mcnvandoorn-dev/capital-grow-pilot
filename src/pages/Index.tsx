@@ -194,15 +194,31 @@ const Index = () => {
   const forwardAnnualCashflow = publicForwardAnnualDividends + privateNetAnnualCashflow;
   const forwardYieldPct = totalValue > 0 ? (forwardAnnualCashflow / totalValue) * 100 : 0;
 
+  // ─── KPI: Weighted average Yield on Cost ───
+  const weightedYoC = useMemo(() => {
+    if (!positions || !dividendPerShareMap) return 0;
+    let totalCostBasis = 0;
+    let totalAnnualDiv = 0;
+    for (const p of positions) {
+      const divPerShare = dividendPerShareMap.get(p.security_id);
+      if (divPerShare != null && p.avg_cost_basis > 0) {
+        const annualDivForPosition = divPerShare * p.quantity;
+        totalAnnualDiv += annualDivForPosition;
+        totalCostBasis += p.total_cost_basis;
+      }
+    }
+    return totalCostBasis > 0 ? (totalAnnualDiv / totalCostBasis) * 100 : 0;
+  }, [positions, dividendPerShareMap]);
+
   const positionCount = (positions?.length ?? 0) + (privateInvestments?.length ?? 0);
 
   return (
     <AppLayout title="Portfolio" subtitle="Overzicht van al je strategieën samen" actions={<CurrencyToggle />}>
       {/* KPI row */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6 mb-6">
         {isLoading ? (
           <>
-            {Array.from({ length: 5 }).map((_, i) => (
+            {Array.from({ length: 6 }).map((_, i) => (
               <Card key={i} className="shadow-sm">
                 <CardContent className="p-5">
                   <Skeleton className="h-4 w-20 mb-2" />
@@ -243,6 +259,12 @@ const Index = () => {
               value={`${forwardYieldPct.toFixed(2)}%`}
               subtitle={`Verwacht: ${fmt(forwardAnnualCashflow)}/jaar`}
               icon={Percent}
+            />
+            <KpiCard
+              label="Yield on Cost"
+              value={`${weightedYoC.toFixed(2)}%`}
+              subtitle="Gewogen gem. over alle posities"
+              icon={TrendingUp}
             />
             <KpiCard
               label="Posities"
