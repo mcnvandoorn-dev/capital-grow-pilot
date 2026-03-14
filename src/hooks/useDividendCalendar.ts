@@ -113,6 +113,13 @@ export function useDividendCalendar() {
       const latestExDate = new Date(latest.ex_date);
       const intervalMonths = frequencyToMonths(sec.dividend_frequency);
 
+      // Derive amount_per_share: use stored value, or fall back to total_amount / quantity
+      let derivedAmountPerShare = latest.amount_per_share;
+      if (!derivedAmountPerShare || derivedAmountPerShare === 0) {
+        const totalAmt = (latest as any).total_amount ?? (latest as any).net_amount ?? 0;
+        derivedAmountPerShare = pos.quantity > 0 ? totalAmt / pos.quantity : 0;
+      }
+
       // Calculate pay-date offset from ex-date
       let payDateOffsetDays = 14; // default
       if (latest.pay_date) {
