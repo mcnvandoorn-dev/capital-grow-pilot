@@ -120,24 +120,21 @@ export default function DividendCalendar() {
   return (
     <AppLayout title="Dividend Kalender" subtitle="Verwachte ex-dates en pay-dates">
       <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Dividend Kalender</h1>
-          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
-            Verwachte ex-dates en pay-dates op basis van je huidige posities en historische data
-            <Tooltip>
-              <TooltipTrigger>
-                <Info className="h-3.5 w-3.5 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-[280px]">
-                <p className="text-xs">
-                  Projecties zijn gebaseerd op het laatste ontvangen dividend en de bekende frequentie.
-                  Werkelijke data en bedragen kunnen afwijken.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </p>
-        </div>
+        {/* Toelichting */}
+        <p className="text-sm text-muted-foreground flex items-center gap-1">
+          Projecties op basis van je huidige posities en historische dividenddata
+          <Tooltip>
+            <TooltipTrigger>
+              <Info className="h-3.5 w-3.5 text-muted-foreground" />
+            </TooltipTrigger>
+            <TooltipContent className="max-w-[280px]">
+              <p className="text-xs">
+                Gebaseerd op het laatste ontvangen dividend en de bekende frequentie.
+                Werkelijke data en bedragen kunnen afwijken.
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </p>
 
         {/* KPI strip */}
         {isLoading ? (
