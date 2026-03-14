@@ -54,7 +54,7 @@ export function HoldingsTable({ positions }: HoldingsTableProps) {
       </TableHeader>
       <TableBody>
         {sorted.map((pos) => (
-          <TableRow key={pos.id} className="cursor-pointer hover:bg-muted/50">
+          <TableRow key={pos.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/ticker-deep-dive?security=${pos.security_id}`)}>
             <TableCell className="font-mono text-sm font-medium">
               {pos.security.ticker}
             </TableCell>
