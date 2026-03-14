@@ -254,7 +254,7 @@ const Index = () => {
                 ))}
               </div>
             ) : hasPositions ? (
-              <HoldingsTable positions={positions ?? []} />
+              <HoldingsTable positions={positions ?? []} dividendPerShareMap={dividendPerShareMap} />
             ) : (
               <EmptyState
                 icon={LayoutDashboard}
