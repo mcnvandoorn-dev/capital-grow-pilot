@@ -62,7 +62,7 @@ export function useDividendCalendar() {
       const [histRes, secRes] = await Promise.all([
         supabase
           .from("dividend_history")
-          .select("security_id, ex_date, pay_date, amount_per_share")
+          .select("security_id, ex_date, pay_date, amount_per_share, total_amount, net_amount")
           .in("portfolio_id", portfolioIds)
           .order("ex_date", { ascending: false }),
         supabase
@@ -113,6 +113,13 @@ export function useDividendCalendar() {
       const latestExDate = new Date(latest.ex_date);
       const intervalMonths = frequencyToMonths(sec.dividend_frequency);
 
+      // Derive amount_per_share: use stored value, or fall back to total_amount / quantity
+      let derivedAmountPerShare = latest.amount_per_share;
+      if (!derivedAmountPerShare || derivedAmountPerShare === 0) {
+        const totalAmt = (latest as any).total_amount ?? (latest as any).net_amount ?? 0;
+        derivedAmountPerShare = pos.quantity > 0 ? totalAmt / pos.quantity : 0;
+      }
+
       // Calculate pay-date offset from ex-date
       let payDateOffsetDays = 14; // default
       if (latest.pay_date) {
@@ -143,9 +150,9 @@ export function useDividendCalendar() {
           name: sec.name,
           expectedExDate: exDateStr,
           expectedPayDate: payDate.toISOString().split("T")[0],
-          amountPerShare: latest.amount_per_share,
+          amountPerShare: derivedAmountPerShare,
           quantity: pos.quantity,
-          estimatedTotal: latest.amount_per_share * pos.quantity,
+          estimatedTotal: derivedAmountPerShare * pos.quantity,
           frequency: sec.dividend_frequency ?? "quarterly",
           confidence,
         });
