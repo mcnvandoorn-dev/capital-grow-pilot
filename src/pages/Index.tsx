@@ -135,6 +135,7 @@ const Index = () => {
     return map;
   }, [positions, fundamentalYields]);
 
+  const isLoading = loadingPortfolios || loadingPositions;
   const hasPositions = (positions?.length ?? 0) > 0 || (privateInvestments?.length ?? 0) > 0;
 
   // Calculate KPIs — Portfolio = publiek + privaat
