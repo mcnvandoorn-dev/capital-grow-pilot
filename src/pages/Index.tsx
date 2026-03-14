@@ -184,9 +184,9 @@ const Index = () => {
   const publicForwardAnnualDividends = useMemo(() => {
     if (!positions || !fundamentalYields) return 0;
     return positions.reduce((sum, p) => {
-      const yieldPct = fundamentalYields.get(p.security_id) ?? 0;
+      const yieldDecimal = fundamentalYields.get(p.security_id) ?? 0;
       const mv = p.market_value ?? p.total_cost_basis;
-      return sum + (yieldPct / 100) * mv;
+      return sum + yieldDecimal * mv;
     }, 0);
   }, [positions, fundamentalYields]);
 
