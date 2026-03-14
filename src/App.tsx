@@ -16,6 +16,7 @@ import Alerts from "./pages/Alerts";
 import PortfolioBreakdown from "./pages/PortfolioBreakdown";
 import TickerDeepDive from "./pages/TickerDeepDive";
 import RebalancingAdvisor from "./pages/RebalancingAdvisor";
+import DividendCalendar from "./pages/DividendCalendar";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
