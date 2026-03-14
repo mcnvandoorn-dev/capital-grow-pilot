@@ -122,14 +122,15 @@ const Index = () => {
 
   // Compute annual dividend per share for YoC calculation
   // YoC = (annual div per share / avg cost) * 100
-  // annual div per share = (yield% / 100) * market_price
+  // dividend_yield is stored as decimal (e.g., 0.052 = 5.2%)
+  // annual div per share = yield_decimal * market_price
   const dividendPerShareMap = useMemo(() => {
     if (!positions || !fundamentalYields) return new Map<string, number>();
     const map = new Map<string, number>();
     for (const pos of positions) {
-      const yieldPct = fundamentalYields.get(pos.security_id);
-      if (yieldPct != null && pos.market_price != null) {
-        map.set(pos.security_id, (yieldPct / 100) * pos.market_price);
+      const yieldDecimal = fundamentalYields.get(pos.security_id);
+      if (yieldDecimal != null && pos.market_price != null) {
+        map.set(pos.security_id, yieldDecimal * pos.market_price);
       }
     }
     return map;
@@ -183,9 +184,9 @@ const Index = () => {
   const publicForwardAnnualDividends = useMemo(() => {
     if (!positions || !fundamentalYields) return 0;
     return positions.reduce((sum, p) => {
-      const yieldPct = fundamentalYields.get(p.security_id) ?? 0;
+      const yieldDecimal = fundamentalYields.get(p.security_id) ?? 0;
       const mv = p.market_value ?? p.total_cost_basis;
-      return sum + (yieldPct / 100) * mv;
+      return sum + yieldDecimal * mv;
     }, 0);
   }, [positions, fundamentalYields]);
 
