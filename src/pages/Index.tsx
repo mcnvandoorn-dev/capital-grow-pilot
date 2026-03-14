@@ -8,6 +8,7 @@ import { AllocationChart } from "@/components/dashboard/AllocationChart";
 import { AddTransactionDialog } from "@/components/dashboard/AddTransactionDialog";
 import { IbkrDailyWidget } from "@/components/dashboard/IbkrDailyWidget";
 import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
+import { DripTracker } from "@/components/dashboard/DripTracker";
 import { CurrencyToggle } from "@/components/dashboard/CurrencyToggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
