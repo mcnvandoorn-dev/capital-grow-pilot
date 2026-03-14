@@ -8,11 +8,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { PositionWithDetails } from "@/hooks/usePortfolioData";
 
 interface HoldingsTableProps {
   positions: PositionWithDetails[];
+  /** Map of security_id → forward annual dividend per share */
+  dividendPerShareMap?: Map<string, number>;
 }
 
 function formatCurrency(value: number | null, currency = "EUR") {
@@ -30,7 +33,7 @@ function formatPct(value: number | null) {
   return `${sign}${value.toFixed(2)}%`;
 }
 
-export function HoldingsTable({ positions }: HoldingsTableProps) {
+export function HoldingsTable({ positions, dividendPerShareMap }: HoldingsTableProps) {
   const navigate = useNavigate();
   const sorted = [...positions].sort((a, b) => {
     const aVal = a.market_value ?? 0;
@@ -48,55 +51,79 @@ export function HoldingsTable({ positions }: HoldingsTableProps) {
           <TableHead className="text-right">Aantal</TableHead>
           <TableHead className="text-right">Koers</TableHead>
           <TableHead className="text-right">Waarde</TableHead>
+          <TableHead className="text-right">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help border-b border-dotted border-muted-foreground">YoC</span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs max-w-[200px]">Yield on Cost: (jaarlijks dividend per aandeel / gemiddelde aankoopprijs) × 100%</p>
+              </TooltipContent>
+            </Tooltip>
+          </TableHead>
           <TableHead className="text-right">P/L</TableHead>
           <TableHead className="text-right">P/L %</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {sorted.map((pos) => (
-          <TableRow key={pos.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/ticker-deep-dive?security=${pos.security_id}`)}>
-            <TableCell className="font-mono text-sm font-medium">
-              {pos.security.ticker}
-            </TableCell>
-            <TableCell className="max-w-[200px] truncate">
-              {pos.security.name ?? "—"}
-            </TableCell>
-            <TableCell>
-              <Badge variant="secondary" className="text-xs font-normal">
-                {pos.security.asset_class}
-              </Badge>
-            </TableCell>
-            <TableCell className="text-right tabular-nums">
-              {pos.quantity.toLocaleString("nl-NL")}
-            </TableCell>
-            <TableCell className="text-right tabular-nums">
-              {formatCurrency(pos.market_price, pos.security.currency)}
-            </TableCell>
-            <TableCell className="text-right tabular-nums font-medium">
-              {formatCurrency(pos.market_value, pos.currency)}
-            </TableCell>
-            <TableCell
-              className={cn(
-                "text-right tabular-nums",
-                pos.unrealized_pnl !== null && pos.unrealized_pnl >= 0
-                  ? "text-positive"
-                  : "text-negative"
-              )}
-            >
-              {formatCurrency(pos.unrealized_pnl, pos.currency)}
-            </TableCell>
-            <TableCell
-              className={cn(
-                "text-right tabular-nums",
-                pos.unrealized_pnl_pct !== null && pos.unrealized_pnl_pct >= 0
-                  ? "text-positive"
-                  : "text-negative"
-              )}
-            >
-              {formatPct(pos.unrealized_pnl_pct)}
-            </TableCell>
-          </TableRow>
-        ))}
+        {sorted.map((pos) => {
+          // YoC = (annual dividend per share / avg cost basis) * 100
+          const annualDivPerShare = dividendPerShareMap?.get(pos.security_id) ?? null;
+          const yoc = annualDivPerShare !== null && pos.avg_cost_basis > 0
+            ? (annualDivPerShare / pos.avg_cost_basis) * 100
+            : null;
+
+          return (
+            <TableRow key={pos.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/ticker-deep-dive?security=${pos.security_id}`)}>
+              <TableCell className="font-mono text-sm font-medium">
+                {pos.security.ticker}
+              </TableCell>
+              <TableCell className="max-w-[200px] truncate">
+                {pos.security.name ?? "—"}
+              </TableCell>
+              <TableCell>
+                <Badge variant="secondary" className="text-xs font-normal">
+                  {pos.security.asset_class}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {pos.quantity.toLocaleString("nl-NL")}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatCurrency(pos.market_price, pos.security.currency)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums font-medium">
+                {formatCurrency(pos.market_value, pos.currency)}
+              </TableCell>
+              <TableCell className={cn(
+                "text-right tabular-nums font-medium",
+                yoc !== null && yoc >= 8 ? "text-primary" : ""
+              )}>
+                {yoc !== null ? `${yoc.toFixed(1)}%` : "—"}
+              </TableCell>
+              <TableCell
+                className={cn(
+                  "text-right tabular-nums",
+                  pos.unrealized_pnl !== null && pos.unrealized_pnl >= 0
+                    ? "text-positive"
+                    : "text-negative"
+                )}
+              >
+                {formatCurrency(pos.unrealized_pnl, pos.currency)}
+              </TableCell>
+              <TableCell
+                className={cn(
+                  "text-right tabular-nums",
+                  pos.unrealized_pnl_pct !== null && pos.unrealized_pnl_pct >= 0
+                    ? "text-positive"
+                    : "text-negative"
+                )}
+              >
+                {formatPct(pos.unrealized_pnl_pct)}
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );

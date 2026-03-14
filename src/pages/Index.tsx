@@ -120,6 +120,21 @@ const Index = () => {
     },
   });
 
+  // Compute annual dividend per share for YoC calculation
+  // YoC = (annual div per share / avg cost) * 100
+  // annual div per share = (yield% / 100) * market_price
+  const dividendPerShareMap = useMemo(() => {
+    if (!positions || !fundamentalYields) return new Map<string, number>();
+    const map = new Map<string, number>();
+    for (const pos of positions) {
+      const yieldPct = fundamentalYields.get(pos.security_id);
+      if (yieldPct != null && pos.market_price != null) {
+        map.set(pos.security_id, (yieldPct / 100) * pos.market_price);
+      }
+    }
+    return map;
+  }, [positions, fundamentalYields]);
+
   const isLoading = loadingPortfolios || loadingPositions;
   const hasPositions = (positions?.length ?? 0) > 0 || (privateInvestments?.length ?? 0) > 0;
 
@@ -254,7 +269,7 @@ const Index = () => {
                 ))}
               </div>
             ) : hasPositions ? (
-              <HoldingsTable positions={positions ?? []} />
+              <HoldingsTable positions={positions ?? []} dividendPerShareMap={dividendPerShareMap} />
             ) : (
               <EmptyState
                 icon={LayoutDashboard}
