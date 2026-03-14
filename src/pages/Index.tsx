@@ -261,6 +261,12 @@ const Index = () => {
               icon={Percent}
             />
             <KpiCard
+              label="Yield on Cost"
+              value={`${weightedYoC.toFixed(2)}%`}
+              subtitle="Gewogen gem. over alle posities"
+              icon={TrendingUp}
+            />
+            <KpiCard
               label="Posities"
               value={String(positionCount)}
               subtitle={`${positions?.length ?? 0} publiek · ${privateInvestments?.length ?? 0} privaat`}
