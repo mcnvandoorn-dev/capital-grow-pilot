@@ -241,8 +241,9 @@ const Index = () => {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Holdings — 2/3 width */}
         <Card className="lg:col-span-2 shadow-sm">
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between">
             <CardTitle className="text-base font-medium">Posities</CardTitle>
+            <AddTransactionDialog />
           </CardHeader>
           <CardContent>
             {isLoading ? (
