@@ -293,6 +293,18 @@ const Index = () => {
         </Card>
       </div>
 
+      {/* DRIP Compound Growth Tracker */}
+      <Card className="mt-6 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <span>💰</span> DRIP Tracker — Compound Growth
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DripTracker />
+        </CardContent>
+      </Card>
+
       {/* IBKR Daily Widget */}
       <div className="mt-6">
         <IbkrDailyWidget />
