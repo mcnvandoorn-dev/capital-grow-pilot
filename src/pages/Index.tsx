@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { HoldingsTable } from "@/components/dashboard/HoldingsTable";
 import { AllocationChart } from "@/components/dashboard/AllocationChart";
+import { AddTransactionDialog } from "@/components/dashboard/AddTransactionDialog";
 import { IbkrDailyWidget } from "@/components/dashboard/IbkrDailyWidget";
 import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
 import { CurrencyToggle } from "@/components/dashboard/CurrencyToggle";
