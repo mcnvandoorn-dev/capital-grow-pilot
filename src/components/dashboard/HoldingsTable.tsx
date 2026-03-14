@@ -31,6 +31,7 @@ function formatPct(value: number | null) {
 }
 
 export function HoldingsTable({ positions }: HoldingsTableProps) {
+  const navigate = useNavigate();
   const sorted = [...positions].sort((a, b) => {
     const aVal = a.market_value ?? 0;
     const bVal = b.market_value ?? 0;
