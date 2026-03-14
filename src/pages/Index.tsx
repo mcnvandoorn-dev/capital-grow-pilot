@@ -194,6 +194,22 @@ const Index = () => {
   const forwardAnnualCashflow = publicForwardAnnualDividends + privateNetAnnualCashflow;
   const forwardYieldPct = totalValue > 0 ? (forwardAnnualCashflow / totalValue) * 100 : 0;
 
+  // ─── KPI: Weighted average Yield on Cost ───
+  const weightedYoC = useMemo(() => {
+    if (!positions || !dividendPerShareMap) return 0;
+    let totalCostBasis = 0;
+    let totalAnnualDiv = 0;
+    for (const p of positions) {
+      const divPerShare = dividendPerShareMap.get(p.security_id);
+      if (divPerShare != null && p.avg_cost_basis > 0) {
+        const annualDivForPosition = divPerShare * p.quantity;
+        totalAnnualDiv += annualDivForPosition;
+        totalCostBasis += p.total_cost_basis;
+      }
+    }
+    return totalCostBasis > 0 ? (totalAnnualDiv / totalCostBasis) * 100 : 0;
+  }, [positions, dividendPerShareMap]);
+
   const positionCount = (positions?.length ?? 0) + (privateInvestments?.length ?? 0);
 
   return (
