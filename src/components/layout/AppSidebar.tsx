@@ -8,6 +8,7 @@ import {
   PieChart,
   Search,
   Scale,
+  CalendarDays,
 } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { NavLink } from "@/components/NavLink";
