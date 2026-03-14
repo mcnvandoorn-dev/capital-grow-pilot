@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -30,6 +31,7 @@ function formatPct(value: number | null) {
 }
 
 export function HoldingsTable({ positions }: HoldingsTableProps) {
+  const navigate = useNavigate();
   const sorted = [...positions].sort((a, b) => {
     const aVal = a.market_value ?? 0;
     const bVal = b.market_value ?? 0;
@@ -52,7 +54,7 @@ export function HoldingsTable({ positions }: HoldingsTableProps) {
       </TableHeader>
       <TableBody>
         {sorted.map((pos) => (
-          <TableRow key={pos.id} className="cursor-pointer hover:bg-muted/50">
+          <TableRow key={pos.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/ticker-deep-dive?security=${pos.security_id}`)}>
             <TableCell className="font-mono text-sm font-medium">
               {pos.security.ticker}
             </TableCell>

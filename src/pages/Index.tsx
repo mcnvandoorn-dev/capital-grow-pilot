@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { HoldingsTable } from "@/components/dashboard/HoldingsTable";
 import { AllocationChart } from "@/components/dashboard/AllocationChart";
+import { AddTransactionDialog } from "@/components/dashboard/AddTransactionDialog";
 import { IbkrDailyWidget } from "@/components/dashboard/IbkrDailyWidget";
 import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
 import { CurrencyToggle } from "@/components/dashboard/CurrencyToggle";
@@ -240,8 +241,9 @@ const Index = () => {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Holdings — 2/3 width */}
         <Card className="lg:col-span-2 shadow-sm">
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between">
             <CardTitle className="text-base font-medium">Posities</CardTitle>
+            <AddTransactionDialog />
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -256,11 +258,13 @@ const Index = () => {
               <EmptyState
                 icon={LayoutDashboard}
                 title="Geen posities"
-                description="Voeg een transactie toe of promoveer een bedrijf vanuit je watchlist om te beginnen."
+                description="Voeg een transactie toe of synchroniseer via IBKR om te beginnen."
                 action={
-                  <Button variant="outline" size="sm">
-                    Transactie toevoegen
-                  </Button>
+                  <AddTransactionDialog>
+                    <Button variant="outline" size="sm">
+                      Transactie toevoegen
+                    </Button>
+                  </AddTransactionDialog>
                 }
               />
             )}
