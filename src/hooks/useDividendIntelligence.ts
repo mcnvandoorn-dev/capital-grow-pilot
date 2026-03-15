@@ -154,6 +154,8 @@ export function useDividendIntelligence(
           mv && mv > 0 ? (annualDiv / mv) * 100 : null;
 
         totalAnnualIncome += annualDiv;
+        totalAnnualGross += annualGross;
+        totalAnnualTax += annualTax;
         if (mv) totalMarketValue += mv;
 
         secMetrics.push({
