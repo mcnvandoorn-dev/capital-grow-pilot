@@ -97,6 +97,8 @@ export function useDividendIntelligence(
       }
 
       let totalAnnualIncome = 0;
+      let totalAnnualGross = 0;
+      let totalAnnualTax = 0;
       let totalMarketValue = 0;
       const secMetrics: SecurityDividendMetrics[] = [];
       const growthRates: number[] = [];
