@@ -151,6 +151,10 @@ export function useDividendCalendar() {
         const payDate = new Date(nextDate);
         payDate.setDate(payDate.getDate() + payDateOffsetDays);
 
+        const estTotal = derivedAmountPerShare * pos.quantity;
+        const estTax = estTotal * avgTaxRate;
+        const estNet = estTotal - estTax;
+
         events.push({
           securityId: secId,
           ticker: sec.ticker,
@@ -159,7 +163,9 @@ export function useDividendCalendar() {
           expectedPayDate: payDate.toISOString().split("T")[0],
           amountPerShare: derivedAmountPerShare,
           quantity: pos.quantity,
-          estimatedTotal: derivedAmountPerShare * pos.quantity,
+          estimatedTotal: estTotal,
+          estimatedTax: estTax,
+          estimatedNet: estNet,
           frequency: sec.dividend_frequency ?? "quarterly",
           confidence,
         });
