@@ -76,7 +76,9 @@ function MonthCard({ monthKey, events }: { monthKey: string; events: CalendarDiv
               <TableHead className="h-8 text-xs">Ex-date</TableHead>
               <TableHead className="h-8 text-xs">Pay-date</TableHead>
               <TableHead className="h-8 text-xs text-right">Per aandeel</TableHead>
-              <TableHead className="h-8 text-xs text-right">Geschat totaal</TableHead>
+              <TableHead className="h-8 text-xs text-right">Bruto</TableHead>
+              <TableHead className="h-8 text-xs text-right">Belasting</TableHead>
+              <TableHead className="h-8 text-xs text-right">Netto</TableHead>
               <TableHead className="h-8 text-xs text-center">Zekerheid</TableHead>
             </TableRow>
           </TableHeader>
@@ -93,6 +95,12 @@ function MonthCard({ monthKey, events }: { monthKey: string; events: CalendarDiv
                 </TableCell>
                 <TableCell className="py-2 text-right font-medium text-sm">
                   {formatCurrency(ev.estimatedTotal)}
+                </TableCell>
+                <TableCell className="py-2 text-right text-sm text-amber-600 dark:text-amber-400">
+                  {ev.estimatedTax > 0 ? `-${formatCurrency(ev.estimatedTax)}` : "—"}
+                </TableCell>
+                <TableCell className="py-2 text-right font-medium text-sm">
+                  {formatCurrency(ev.estimatedNet)}
                 </TableCell>
                 <TableCell className="py-2 text-center">
                   <ConfidenceBadge confidence={ev.confidence} />
