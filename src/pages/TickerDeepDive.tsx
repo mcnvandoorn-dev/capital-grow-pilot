@@ -17,6 +17,7 @@ import { PriceChart } from "@/components/deepdive/PriceChart";
 import { DividendHistorySection } from "@/components/deepdive/DividendHistorySection";
 import { DeepDiveTab } from "@/components/deepdive/DeepDiveTab";
 import { TickerInsights } from "@/components/deepdive/TickerInsights";
+import { useDeepDive } from "@/hooks/useDeepDive";
 import { ScoreBadge } from "@/components/dashboard/ScoreBadge";
 import { usePortfolios, usePositions } from "@/hooks/usePortfolioData";
 import { useTickerDetail } from "@/hooks/useTickerDetail";
