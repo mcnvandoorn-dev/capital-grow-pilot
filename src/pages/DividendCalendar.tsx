@@ -48,6 +48,8 @@ function MonthCard({ monthKey, events }: { monthKey: string; events: CalendarDiv
   const [year, month] = monthKey.split("-").map(Number);
   const monthName = monthNames[month - 1];
   const totalEstimated = events.reduce((s, e) => s + e.estimatedTotal, 0);
+  const totalTax = events.reduce((s, e) => s + e.estimatedTax, 0);
+  const totalNet = events.reduce((s, e) => s + e.estimatedNet, 0);
   const now = new Date();
   const isCurrentMonth = now.getFullYear() === year && now.getMonth() + 1 === month;
 
