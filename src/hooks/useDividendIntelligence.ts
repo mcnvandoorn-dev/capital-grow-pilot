@@ -8,6 +8,8 @@ export interface SecurityDividendMetrics {
   name: string | null;
   sector: string | null;
   annualDividendEur: number;
+  annualGrossEur: number;
+  annualTaxEur: number;
   currentYield: number | null;
   paymentCount12m: number;
   frequency: string;
