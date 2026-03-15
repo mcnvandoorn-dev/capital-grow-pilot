@@ -228,6 +228,8 @@ export function useDividendIntelligence(
 
       return {
         totalAnnualIncome,
+        totalAnnualGross,
+        totalAnnualTax,
         weightedYield,
         avgGrowthPct,
         securities: secMetrics,

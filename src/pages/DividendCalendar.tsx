@@ -65,8 +65,10 @@ function MonthCard({ monthKey, events }: { monthKey: string; events: CalendarDiv
             )}
           </CardTitle>
           <div className="text-right">
-            <p className="text-sm font-semibold text-foreground">{formatCurrency(totalEstimated)}</p>
-            <p className="text-[11px] text-muted-foreground">{events.length} dividend{events.length !== 1 ? "en" : ""}</p>
+            <p className="text-sm font-semibold text-foreground">{formatCurrency(totalNet)}</p>
+            <p className="text-[11px] text-muted-foreground">
+              {events.length} div · {totalTax > 0 ? `belasting: ${formatCurrency(totalTax)}` : "geen belasting"}
+            </p>
           </div>
         </div>
       </CardHeader>
