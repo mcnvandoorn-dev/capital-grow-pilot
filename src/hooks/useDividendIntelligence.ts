@@ -115,6 +115,14 @@ export function useDividendIntelligence(
           (s, d) => s + d.net_amount * d.fx_rate_to_base,
           0
         );
+        const annualGross = last12m.reduce(
+          (s, d) => s + (d.total_amount ?? d.net_amount) * d.fx_rate_to_base,
+          0
+        );
+        const annualTax = last12m.reduce(
+          (s, d) => s + (d.withholding_tax ?? 0) * d.fx_rate_to_base,
+          0
+        );
 
         // YoY growth (needs 2 years of data - no fallback to avoid misleading metrics)
         const prev12m = divs.filter((d) => {
