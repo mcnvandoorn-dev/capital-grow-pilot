@@ -19,6 +19,7 @@ import {
   Wallet,
   LayoutDashboard,
   Percent,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
