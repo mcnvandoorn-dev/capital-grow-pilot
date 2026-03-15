@@ -238,6 +238,15 @@ const Index = () => {
 
   return (
     <AppLayout title="Portfolio" subtitle="Overzicht van al je strategieën samen" actions={<CurrencyToggle />}>
+      {/* Sync staleness warning */}
+      {syncStaleHours !== null && syncStaleHours > 24 && (
+        <Alert variant="destructive" className="mb-4 border-amber-500/50 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-500/30 [&>svg]:text-amber-600">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="text-sm">
+            Laatste IBKR-sync is {Math.floor(syncStaleHours / 24)} dag{Math.floor(syncStaleHours / 24) !== 1 ? "en" : ""} geleden ({lastSyncDate}). Controleer je verbinding in Instellingen.
+          </AlertDescription>
+        </Alert>
+      )}
       {/* KPI row */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6 mb-6">
         {isLoading ? (
