@@ -19,6 +19,7 @@ import {
   Wallet,
   LayoutDashboard,
   Percent,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +32,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePrivateInvestments, usePrivateInvestmentMetrics } from "@/hooks/usePrivateInvestments";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 function formatAmount(value: number, currency: "EUR" | "USD") {
   return new Intl.NumberFormat("nl-NL", {
@@ -139,6 +141,28 @@ const Index = () => {
   const isLoading = loadingPortfolios || loadingPositions;
   const hasPositions = (positions?.length ?? 0) > 0 || (privateInvestments?.length ?? 0) > 0;
 
+  // Check sync staleness
+  const { data: lastSyncDate } = useQuery({
+    queryKey: ["last-sync-date", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("daily_account_summary")
+        .select("date")
+        .order("date", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return data?.[0]?.date ?? null;
+    },
+  });
+
+  const syncStaleHours = useMemo(() => {
+    if (!lastSyncDate) return null;
+    const lastDate = new Date(lastSyncDate + "T06:00:00Z");
+    const diffMs = Date.now() - lastDate.getTime();
+    return diffMs / (1000 * 60 * 60);
+  }, [lastSyncDate]);
+
   // Calculate KPIs — Portfolio = publiek + privaat
   const publicValue = useMemo(
     () =>
@@ -214,6 +238,15 @@ const Index = () => {
 
   return (
     <AppLayout title="Portfolio" subtitle="Overzicht van al je strategieën samen" actions={<CurrencyToggle />}>
+      {/* Sync staleness warning */}
+      {syncStaleHours !== null && syncStaleHours > 24 && (
+        <Alert variant="destructive" className="mb-4 border-amber-500/50 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-500/30 [&>svg]:text-amber-600">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="text-sm">
+            Laatste IBKR-sync is {Math.floor(syncStaleHours / 24)} dag{Math.floor(syncStaleHours / 24) !== 1 ? "en" : ""} geleden ({lastSyncDate}). Controleer je verbinding in Instellingen.
+          </AlertDescription>
+        </Alert>
+      )}
       {/* KPI row */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6 mb-6">
         {isLoading ? (
