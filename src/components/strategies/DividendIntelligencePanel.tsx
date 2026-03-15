@@ -183,14 +183,16 @@ export function DividendIntelligencePanel({ data, fmt }: Props) {
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {/* Header row */}
-          <div className="flex items-center justify-between py-1.5 border-b text-xs text-muted-foreground font-medium min-w-[700px]">
+          <div className="flex items-center justify-between py-1.5 border-b text-xs text-muted-foreground font-medium min-w-[800px]">
             <div className="flex items-center gap-3">
               <span className="w-16">Ticker</span>
               <span className="w-[160px]">Naam</span>
               <span className="w-20">Frequentie</span>
             </div>
             <div className="flex items-center gap-3 text-right">
-              <span className="w-20">Jaarlijks</span>
+              <span className="w-20">Bruto</span>
+              <span className="w-16">Belasting</span>
+              <span className="w-20">Netto</span>
               <span className="w-14">Yield</span>
               <span className="w-14">Groei</span>
               {hasFundamentals && (
