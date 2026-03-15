@@ -234,6 +234,7 @@ const Index = () => {
               value={fmt(totalValue)}
               subtitle={`Publiek: ${fmt(publicValue)} · Privaat: ${fmt(privateMetrics.totalEquity)}`}
               icon={currency === "EUR" ? Euro : DollarSign}
+              href="/portfolio-breakdown"
             />
             <KpiCard
               label="Ongerealiseerd P/L"
@@ -247,30 +248,35 @@ const Index = () => {
                   : "neutral"
               }
               icon={TrendingUp}
+              href="/portfolio-breakdown"
             />
             <KpiCard
               label="Maandelijkse cashflow YTD"
               value={fmt(monthlyCashflowYTD)}
               subtitle={`Totaal ontvangen YTD: ${fmt(totalCashflowYTD)}`}
               icon={Wallet}
+              href="/dividend-calendar"
             />
             <KpiCard
               label="Forward yield (jaar)"
               value={`${forwardYieldPct.toFixed(2)}%`}
               subtitle={`Verwacht: ${fmt(forwardAnnualCashflow)}/jaar`}
               icon={Percent}
+              href="/strategies"
             />
             <KpiCard
               label="Yield on Cost"
               value={`${weightedYoC.toFixed(2)}%`}
               subtitle="Gewogen gem. over alle posities"
               icon={TrendingUp}
+              href="/strategies"
             />
             <KpiCard
               label="Posities"
               value={String(positionCount)}
               subtitle={`${positions?.length ?? 0} publiek · ${privateInvestments?.length ?? 0} privaat`}
               icon={PieChart}
+              href="/portfolio-breakdown"
             />
           </>
         )}
