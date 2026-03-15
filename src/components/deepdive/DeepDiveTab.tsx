@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   Search,
   Upload,
@@ -19,9 +20,10 @@ import { useDeepDive, type DeepDiveItem } from "@/hooks/useDeepDive";
 interface DeepDiveTabProps {
   securityId: string;
   ticker: string;
+  autoSearching?: boolean;
 }
 
-export function DeepDiveTab({ securityId, ticker }: DeepDiveTabProps) {
+export function DeepDiveTab({ securityId, ticker, autoSearching }: DeepDiveTabProps) {
   const { items, isLoading, isSearching, isUploading, searchWeb, uploadPdf, deleteItem } =
     useDeepDive(securityId);
   const [searchQuery, setSearchQuery] = useState("");
@@ -104,6 +106,22 @@ export function DeepDiveTab({ securityId, ticker }: DeepDiveTabProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Auto-analysis progress banner */}
+      {autoSearching && (
+        <Card className="shadow-sm border-primary/20 bg-primary/5">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <div>
+                <p className="text-sm font-medium">Automatische analyse bezig voor {ticker}...</p>
+                <p className="text-xs text-muted-foreground">We zoeken en analyseren relevante bronnen. Dit kan even duren.</p>
+              </div>
+            </div>
+            <Progress value={undefined} className="h-1.5" />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Results list */}
       {isLoading ? (
