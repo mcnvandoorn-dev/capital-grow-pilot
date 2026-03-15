@@ -114,11 +114,36 @@ export function DividendIntelligencePanel({ data, fmt }: Props) {
       </div>
 
       {/* Summary KPIs */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="shadow-sm">
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground mb-1">
-              Jaarlijks dividend inkomen
+              Bruto jaarlijks dividend
+            </p>
+            <p className="text-xl font-semibold tabular-nums">
+              {fmt(data.totalAnnualGross)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground mb-1">
+              Bronbelasting
+            </p>
+            <p className="text-xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+              {data.totalAnnualTax > 0 ? `-${fmt(data.totalAnnualTax)}` : "—"}
+            </p>
+            {data.totalAnnualGross > 0 && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {((data.totalAnnualTax / data.totalAnnualGross) * 100).toFixed(1)}% effectief tarief
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground mb-1">
+              Netto jaarlijks inkomen
             </p>
             <p className="text-xl font-semibold tabular-nums">
               {fmt(data.totalAnnualIncome)}
@@ -133,24 +158,17 @@ export function DividendIntelligencePanel({ data, fmt }: Props) {
                 ? `${data.weightedYield.toFixed(2)}%`
                 : "—"}
             </p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground mb-1">
-              Gem. dividendgroei (trend)
-            </p>
             <p
               className={cn(
-                "text-xl font-semibold tabular-nums",
+                "text-xs tabular-nums mt-0.5",
                 (data.avgGrowthPct ?? 0) >= 0
                   ? "text-primary"
                   : "text-destructive"
               )}
             >
               {data.avgGrowthPct != null
-                ? `${data.avgGrowthPct >= 0 ? "+" : ""}${data.avgGrowthPct.toFixed(1)}%`
-                : "Onvoldoende data"}
+                ? `Groei: ${data.avgGrowthPct >= 0 ? "+" : ""}${data.avgGrowthPct.toFixed(1)}%`
+                : "Onvoldoende groeidata"}
             </p>
           </CardContent>
         </Card>
@@ -165,14 +183,16 @@ export function DividendIntelligencePanel({ data, fmt }: Props) {
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {/* Header row */}
-          <div className="flex items-center justify-between py-1.5 border-b text-xs text-muted-foreground font-medium min-w-[700px]">
+          <div className="flex items-center justify-between py-1.5 border-b text-xs text-muted-foreground font-medium min-w-[800px]">
             <div className="flex items-center gap-3">
               <span className="w-16">Ticker</span>
               <span className="w-[160px]">Naam</span>
               <span className="w-20">Frequentie</span>
             </div>
             <div className="flex items-center gap-3 text-right">
-              <span className="w-20">Jaarlijks</span>
+              <span className="w-20">Bruto</span>
+              <span className="w-16">Belasting</span>
+              <span className="w-20">Netto</span>
               <span className="w-14">Yield</span>
               <span className="w-14">Groei</span>
               {hasFundamentals && (
@@ -190,7 +210,7 @@ export function DividendIntelligencePanel({ data, fmt }: Props) {
               return (
                 <div
                   key={sec.securityId}
-                  className="flex items-center justify-between py-2 border-b last:border-0 min-w-[700px]"
+                  className="flex items-center justify-between py-2 border-b last:border-0 min-w-[800px]"
                 >
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-sm font-medium w-16">
@@ -204,6 +224,12 @@ export function DividendIntelligencePanel({ data, fmt }: Props) {
                     </span>
                   </div>
                   <div className="flex items-center gap-3 text-right">
+                    <span className="text-sm tabular-nums font-medium w-20">
+                      {fmt(sec.annualGrossEur)}
+                    </span>
+                    <span className="text-xs tabular-nums text-amber-600 dark:text-amber-400 w-16">
+                      {sec.annualTaxEur > 0 ? `-${fmt(sec.annualTaxEur)}` : "—"}
+                    </span>
                     <span className="text-sm tabular-nums font-medium w-20">
                       {fmt(sec.annualDividendEur)}
                     </span>

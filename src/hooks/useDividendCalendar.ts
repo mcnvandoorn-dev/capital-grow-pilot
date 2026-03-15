@@ -13,6 +13,8 @@ export interface CalendarDividend {
   amountPerShare: number;
   quantity: number;
   estimatedTotal: number;
+  estimatedTax: number;
+  estimatedNet: number;
   frequency: string;
   confidence: "high" | "medium" | "low";
 }
@@ -62,7 +64,7 @@ export function useDividendCalendar() {
       const [histRes, secRes] = await Promise.all([
         supabase
           .from("dividend_history")
-          .select("security_id, ex_date, pay_date, amount_per_share, total_amount, net_amount")
+          .select("security_id, ex_date, pay_date, amount_per_share, total_amount, net_amount, withholding_tax")
           .in("portfolio_id", portfolioIds)
           .order("ex_date", { ascending: false }),
         supabase
@@ -120,6 +122,11 @@ export function useDividendCalendar() {
         derivedAmountPerShare = pos.quantity > 0 ? totalAmt / pos.quantity : 0;
       }
 
+      // Calculate average withholding tax rate from history
+      const totalGross = secHistory.reduce((s, h) => s + (h.total_amount ?? 0), 0);
+      const totalTax = secHistory.reduce((s, h) => s + (h.withholding_tax ?? 0), 0);
+      const avgTaxRate = totalGross > 0 ? totalTax / totalGross : 0;
+
       // Calculate pay-date offset from ex-date
       let payDateOffsetDays = 14; // default
       if (latest.pay_date) {
@@ -144,6 +151,10 @@ export function useDividendCalendar() {
         const payDate = new Date(nextDate);
         payDate.setDate(payDate.getDate() + payDateOffsetDays);
 
+        const estTotal = derivedAmountPerShare * pos.quantity;
+        const estTax = estTotal * avgTaxRate;
+        const estNet = estTotal - estTax;
+
         events.push({
           securityId: secId,
           ticker: sec.ticker,
@@ -152,7 +163,9 @@ export function useDividendCalendar() {
           expectedPayDate: payDate.toISOString().split("T")[0],
           amountPerShare: derivedAmountPerShare,
           quantity: pos.quantity,
-          estimatedTotal: derivedAmountPerShare * pos.quantity,
+          estimatedTotal: estTotal,
+          estimatedTax: estTax,
+          estimatedNet: estNet,
           frequency: sec.dividend_frequency ?? "quarterly",
           confidence,
         });

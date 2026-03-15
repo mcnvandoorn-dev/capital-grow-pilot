@@ -48,6 +48,8 @@ function MonthCard({ monthKey, events }: { monthKey: string; events: CalendarDiv
   const [year, month] = monthKey.split("-").map(Number);
   const monthName = monthNames[month - 1];
   const totalEstimated = events.reduce((s, e) => s + e.estimatedTotal, 0);
+  const totalTax = events.reduce((s, e) => s + e.estimatedTax, 0);
+  const totalNet = events.reduce((s, e) => s + e.estimatedNet, 0);
   const now = new Date();
   const isCurrentMonth = now.getFullYear() === year && now.getMonth() + 1 === month;
 
@@ -63,8 +65,10 @@ function MonthCard({ monthKey, events }: { monthKey: string; events: CalendarDiv
             )}
           </CardTitle>
           <div className="text-right">
-            <p className="text-sm font-semibold text-foreground">{formatCurrency(totalEstimated)}</p>
-            <p className="text-[11px] text-muted-foreground">{events.length} dividend{events.length !== 1 ? "en" : ""}</p>
+            <p className="text-sm font-semibold text-foreground">{formatCurrency(totalNet)}</p>
+            <p className="text-[11px] text-muted-foreground">
+              {events.length} div · {totalTax > 0 ? `belasting: ${formatCurrency(totalTax)}` : "geen belasting"}
+            </p>
           </div>
         </div>
       </CardHeader>
@@ -76,7 +80,9 @@ function MonthCard({ monthKey, events }: { monthKey: string; events: CalendarDiv
               <TableHead className="h-8 text-xs">Ex-date</TableHead>
               <TableHead className="h-8 text-xs">Pay-date</TableHead>
               <TableHead className="h-8 text-xs text-right">Per aandeel</TableHead>
-              <TableHead className="h-8 text-xs text-right">Geschat totaal</TableHead>
+              <TableHead className="h-8 text-xs text-right">Bruto</TableHead>
+              <TableHead className="h-8 text-xs text-right">Belasting</TableHead>
+              <TableHead className="h-8 text-xs text-right">Netto</TableHead>
               <TableHead className="h-8 text-xs text-center">Zekerheid</TableHead>
             </TableRow>
           </TableHeader>
@@ -93,6 +99,12 @@ function MonthCard({ monthKey, events }: { monthKey: string; events: CalendarDiv
                 </TableCell>
                 <TableCell className="py-2 text-right font-medium text-sm">
                   {formatCurrency(ev.estimatedTotal)}
+                </TableCell>
+                <TableCell className="py-2 text-right text-sm text-amber-600 dark:text-amber-400">
+                  {ev.estimatedTax > 0 ? `-${formatCurrency(ev.estimatedTax)}` : "—"}
+                </TableCell>
+                <TableCell className="py-2 text-right font-medium text-sm">
+                  {formatCurrency(ev.estimatedNet)}
                 </TableCell>
                 <TableCell className="py-2 text-center">
                   <ConfidenceBadge confidence={ev.confidence} />

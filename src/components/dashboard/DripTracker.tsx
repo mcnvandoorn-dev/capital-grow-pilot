@@ -49,7 +49,7 @@ export function DripTracker() {
       if (portfolioIds.length === 0) return [];
       const { data, error } = await supabase
         .from("dividend_history")
-        .select("ex_date, net_amount, fx_rate_to_base, security_id")
+        .select("ex_date, net_amount, total_amount, withholding_tax, fx_rate_to_base, security_id")
         .in("portfolio_id", portfolioIds)
         .order("ex_date", { ascending: true });
       if (error) throw error;
@@ -100,8 +100,11 @@ export function DripTracker() {
     const compoundGain = compoundedValue - totalReceived;
     const monthCount = chartData.length;
     const avgMonthly = totalReceived / monthCount;
-    return { totalReceived, compoundedValue, compoundGain, avgMonthly, monthCount };
-  }, [chartData]);
+    // Calculate total gross and tax
+    const totalGross = (dividends ?? []).reduce((s, d) => s + (d.total_amount ?? d.net_amount) * d.fx_rate_to_base, 0);
+    const totalTax = (dividends ?? []).reduce((s, d) => s + (d.withholding_tax ?? 0) * d.fx_rate_to_base, 0);
+    return { totalReceived, compoundedValue, compoundGain, avgMonthly, monthCount, totalGross, totalTax };
+  }, [chartData, dividends]);
 
   if (isLoading) {
     return <Skeleton className="h-[320px] w-full rounded-lg" />;
@@ -125,10 +128,21 @@ export function DripTracker() {
     <div className="space-y-4">
       {/* Stats row */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard
             icon={DollarSign}
-            label="Totaal ontvangen"
+            label="Bruto ontvangen"
+            value={formatEur(stats.totalGross)}
+          />
+          <StatCard
+            icon={DollarSign}
+            label="Bronbelasting"
+            value={`-${formatEur(stats.totalTax)}`}
+            warn
+          />
+          <StatCard
+            icon={DollarSign}
+            label="Netto ontvangen"
             value={formatEur(stats.totalReceived)}
           />
           <StatCard
@@ -251,11 +265,13 @@ function StatCard({
   label,
   value,
   accent = false,
+  warn = false,
 }: {
   icon: any;
   label: string;
   value: string;
   accent?: boolean;
+  warn?: boolean;
 }) {
   return (
     <div className="rounded-lg border p-3">
@@ -263,7 +279,7 @@ function StatCard({
         <Icon className="h-3.5 w-3.5" />
         {label}
       </div>
-      <p className={`text-sm font-semibold tabular-nums ${accent ? "text-primary" : ""}`}>
+      <p className={`text-sm font-semibold tabular-nums ${accent ? "text-primary" : warn ? "text-amber-600 dark:text-amber-400" : ""}`}>
         {value}
       </p>
     </div>

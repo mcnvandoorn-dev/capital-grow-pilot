@@ -8,6 +8,8 @@ export interface SecurityDividendMetrics {
   name: string | null;
   sector: string | null;
   annualDividendEur: number;
+  annualGrossEur: number;
+  annualTaxEur: number;
   currentYield: number | null;
   paymentCount12m: number;
   frequency: string;
@@ -17,6 +19,8 @@ export interface SecurityDividendMetrics {
 
 export interface DividendIntelligence {
   totalAnnualIncome: number;
+  totalAnnualGross: number;
+  totalAnnualTax: number;
   weightedYield: number | null;
   avgGrowthPct: number | null;
   securities: SecurityDividendMetrics[];
@@ -44,7 +48,7 @@ export function useDividendIntelligence(
 
       const { data: dividends, error } = await supabase
         .from("dividend_history")
-        .select("security_id, net_amount, fx_rate_to_base, ex_date")
+        .select("security_id, net_amount, total_amount, withholding_tax, fx_rate_to_base, ex_date")
         .in("portfolio_id", portfolioIds)
         .order("ex_date", { ascending: true });
 
@@ -52,6 +56,8 @@ export function useDividendIntelligence(
       if (!dividends || dividends.length === 0) {
         return {
           totalAnnualIncome: 0,
+          totalAnnualGross: 0,
+          totalAnnualTax: 0,
           weightedYield: null,
           avgGrowthPct: null,
           securities: [],
@@ -91,6 +97,8 @@ export function useDividendIntelligence(
       }
 
       let totalAnnualIncome = 0;
+      let totalAnnualGross = 0;
+      let totalAnnualTax = 0;
       let totalMarketValue = 0;
       const secMetrics: SecurityDividendMetrics[] = [];
       const growthRates: number[] = [];
@@ -105,6 +113,14 @@ export function useDividendIntelligence(
         );
         const annualDiv = last12m.reduce(
           (s, d) => s + d.net_amount * d.fx_rate_to_base,
+          0
+        );
+        const annualGross = last12m.reduce(
+          (s, d) => s + (d.total_amount ?? d.net_amount) * d.fx_rate_to_base,
+          0
+        );
+        const annualTax = last12m.reduce(
+          (s, d) => s + (d.withholding_tax ?? 0) * d.fx_rate_to_base,
           0
         );
 
@@ -138,6 +154,8 @@ export function useDividendIntelligence(
           mv && mv > 0 ? (annualDiv / mv) * 100 : null;
 
         totalAnnualIncome += annualDiv;
+        totalAnnualGross += annualGross;
+        totalAnnualTax += annualTax;
         if (mv) totalMarketValue += mv;
 
         secMetrics.push({
@@ -146,6 +164,8 @@ export function useDividendIntelligence(
           name: sec.name,
           sector: sec.sector,
           annualDividendEur: annualDiv,
+          annualGrossEur: annualGross,
+          annualTaxEur: annualTax,
           currentYield,
           paymentCount12m: count,
           frequency,
@@ -208,6 +228,8 @@ export function useDividendIntelligence(
 
       return {
         totalAnnualIncome,
+        totalAnnualGross,
+        totalAnnualTax,
         weightedYield,
         avgGrowthPct,
         securities: secMetrics,
