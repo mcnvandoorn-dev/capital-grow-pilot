@@ -69,6 +69,25 @@ export default function TickerDeepDive() {
     portfolioIds
   );
 
+  // Deep dive hook for auto-trigger
+  const { items: deepDiveItems, isLoading: loadingDeepDive, isSearching, searchWeb } = useDeepDive(selectedSecurityId);
+
+  // Auto-trigger deep dive analysis when arriving from portfolio click
+  useEffect(() => {
+    if (
+      securityFromUrl &&
+      selectedSecurityId &&
+      detail &&
+      !loadingDeepDive &&
+      !autoAnalysisTriggered &&
+      !isSearching &&
+      deepDiveItems.length === 0
+    ) {
+      setAutoAnalysisTriggered(true);
+      searchWeb(detail.security.ticker);
+    }
+  }, [securityFromUrl, selectedSecurityId, detail, loadingDeepDive, autoAnalysisTriggered, isSearching, deepDiveItems.length]);
+
   const isLoading = loadingPortfolios || loadingPositions;
   const hasPositions = (positions?.length ?? 0) > 0;
 
