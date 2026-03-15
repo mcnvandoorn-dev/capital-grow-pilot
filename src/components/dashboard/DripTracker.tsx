@@ -49,7 +49,7 @@ export function DripTracker() {
       if (portfolioIds.length === 0) return [];
       const { data, error } = await supabase
         .from("dividend_history")
-        .select("ex_date, net_amount, fx_rate_to_base, security_id")
+        .select("ex_date, net_amount, total_amount, withholding_tax, fx_rate_to_base, security_id")
         .in("portfolio_id", portfolioIds)
         .order("ex_date", { ascending: true });
       if (error) throw error;
