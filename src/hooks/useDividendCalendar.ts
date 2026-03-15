@@ -64,7 +64,7 @@ export function useDividendCalendar() {
       const [histRes, secRes] = await Promise.all([
         supabase
           .from("dividend_history")
-          .select("security_id, ex_date, pay_date, amount_per_share, total_amount, net_amount")
+          .select("security_id, ex_date, pay_date, amount_per_share, total_amount, net_amount, withholding_tax")
           .in("portfolio_id", portfolioIds)
           .order("ex_date", { ascending: false }),
         supabase
