@@ -22,7 +22,7 @@ interface DeepDiveTabProps {
   autoSearching?: boolean;
 }
 
-export function DeepDiveTab({ securityId, ticker }: DeepDiveTabProps) {
+export function DeepDiveTab({ securityId, ticker, autoSearching }: DeepDiveTabProps) {
   const { items, isLoading, isSearching, isUploading, searchWeb, uploadPdf, deleteItem } =
     useDeepDive(securityId);
   const [searchQuery, setSearchQuery] = useState("");
