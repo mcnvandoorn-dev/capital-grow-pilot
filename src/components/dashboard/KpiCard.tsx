@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
@@ -9,11 +10,17 @@ export interface KpiCardProps {
   changeType?: "positive" | "negative" | "neutral";
   icon?: LucideIcon;
   subtitle?: string;
+  href?: string;
 }
 
-export function KpiCard({ label, value, change, changeType = "neutral", icon: Icon, subtitle }: KpiCardProps) {
+export function KpiCard({ label, value, change, changeType = "neutral", icon: Icon, subtitle, href }: KpiCardProps) {
+  const navigate = useNavigate();
+
   return (
-    <Card className="shadow-sm">
+    <Card
+      className={cn("shadow-sm transition-colors", href && "cursor-pointer hover:bg-accent/50")}
+      onClick={href ? () => navigate(href) : undefined}
+    >
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
