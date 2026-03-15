@@ -225,6 +225,12 @@ export function DividendIntelligencePanel({ data, fmt }: Props) {
                   </div>
                   <div className="flex items-center gap-3 text-right">
                     <span className="text-sm tabular-nums font-medium w-20">
+                      {fmt(sec.annualGrossEur)}
+                    </span>
+                    <span className="text-xs tabular-nums text-amber-600 dark:text-amber-400 w-16">
+                      {sec.annualTaxEur > 0 ? `-${fmt(sec.annualTaxEur)}` : "—"}
+                    </span>
+                    <span className="text-sm tabular-nums font-medium w-20">
                       {fmt(sec.annualDividendEur)}
                     </span>
                     <span className="text-xs tabular-nums text-muted-foreground w-14">

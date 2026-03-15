@@ -265,11 +265,13 @@ function StatCard({
   label,
   value,
   accent = false,
+  warn = false,
 }: {
   icon: any;
   label: string;
   value: string;
   accent?: boolean;
+  warn?: boolean;
 }) {
   return (
     <div className="rounded-lg border p-3">
@@ -277,7 +279,7 @@ function StatCard({
         <Icon className="h-3.5 w-3.5" />
         {label}
       </div>
-      <p className={`text-sm font-semibold tabular-nums ${accent ? "text-primary" : ""}`}>
+      <p className={`text-sm font-semibold tabular-nums ${accent ? "text-primary" : warn ? "text-amber-600 dark:text-amber-400" : ""}`}>
         {value}
       </p>
     </div>
