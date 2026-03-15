@@ -164,6 +164,8 @@ export function useDividendIntelligence(
           name: sec.name,
           sector: sec.sector,
           annualDividendEur: annualDiv,
+          annualGrossEur: annualGross,
+          annualTaxEur: annualTax,
           currentYield,
           paymentCount12m: count,
           frequency,
