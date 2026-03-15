@@ -185,7 +185,44 @@ export default function DividendCalendar() {
           </div>
         )}
 
-        {/* Monthly cards */}
+        {/* Monthly bar chart */}
+        {!isLoading && monthKeys.length > 0 && (() => {
+          const now = new Date();
+          const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+          const chartData = monthKeys.map((key) => {
+            const events = byMonth.get(key)!;
+            const total = events.reduce((s, e) => s + e.estimatedTotal, 0);
+            const [, m] = key.split("-").map(Number);
+            return { month: monthNames[m - 1].substring(0, 3), total, key };
+          });
+          const chartConfig = { total: { label: "Verwacht", color: "hsl(var(--primary))" } };
+          return (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-medium">Maandelijks overzicht</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer config={chartConfig} className="h-[200px] w-full">
+                  <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} className="text-xs fill-muted-foreground" />
+                    <YAxis hide />
+                    <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)} />} />
+                    <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                      {chartData.map((entry) => (
+                        <Cell
+                          key={entry.key}
+                          fill={entry.key === currentMonthKey ? "hsl(var(--primary))" : "hsl(var(--primary) / 0.4)"}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          );
+        })()}
+
+
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
