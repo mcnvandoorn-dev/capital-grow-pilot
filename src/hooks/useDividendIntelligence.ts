@@ -19,6 +19,8 @@ export interface SecurityDividendMetrics {
 
 export interface DividendIntelligence {
   totalAnnualIncome: number;
+  totalAnnualGross: number;
+  totalAnnualTax: number;
   weightedYield: number | null;
   avgGrowthPct: number | null;
   securities: SecurityDividendMetrics[];
