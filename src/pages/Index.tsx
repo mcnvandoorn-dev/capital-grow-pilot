@@ -141,6 +141,28 @@ const Index = () => {
   const isLoading = loadingPortfolios || loadingPositions;
   const hasPositions = (positions?.length ?? 0) > 0 || (privateInvestments?.length ?? 0) > 0;
 
+  // Check sync staleness
+  const { data: lastSyncDate } = useQuery({
+    queryKey: ["last-sync-date", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("daily_account_summary")
+        .select("date")
+        .order("date", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return data?.[0]?.date ?? null;
+    },
+  });
+
+  const syncStaleHours = useMemo(() => {
+    if (!lastSyncDate) return null;
+    const lastDate = new Date(lastSyncDate + "T06:00:00Z");
+    const diffMs = Date.now() - lastDate.getTime();
+    return diffMs / (1000 * 60 * 60);
+  }, [lastSyncDate]);
+
   // Calculate KPIs — Portfolio = publiek + privaat
   const publicValue = useMemo(
     () =>
