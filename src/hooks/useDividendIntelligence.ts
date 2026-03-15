@@ -48,7 +48,7 @@ export function useDividendIntelligence(
 
       const { data: dividends, error } = await supabase
         .from("dividend_history")
-        .select("security_id, net_amount, fx_rate_to_base, ex_date")
+        .select("security_id, net_amount, total_amount, withholding_tax, fx_rate_to_base, ex_date")
         .in("portfolio_id", portfolioIds)
         .order("ex_date", { ascending: true });
 
