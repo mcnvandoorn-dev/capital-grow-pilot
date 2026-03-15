@@ -13,6 +13,8 @@ export interface CalendarDividend {
   amountPerShare: number;
   quantity: number;
   estimatedTotal: number;
+  estimatedTax: number;
+  estimatedNet: number;
   frequency: string;
   confidence: "high" | "medium" | "low";
 }
