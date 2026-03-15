@@ -210,7 +210,7 @@ export function DividendIntelligencePanel({ data, fmt }: Props) {
               return (
                 <div
                   key={sec.securityId}
-                  className="flex items-center justify-between py-2 border-b last:border-0 min-w-[700px]"
+                  className="flex items-center justify-between py-2 border-b last:border-0 min-w-[800px]"
                 >
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-sm font-medium w-16">
