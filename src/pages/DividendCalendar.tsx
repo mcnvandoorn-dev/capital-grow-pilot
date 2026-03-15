@@ -14,6 +14,8 @@ import {
 import { CalendarDays, TrendingUp, DollarSign, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useMemo } from "react";
+import { Bar, BarChart, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 const monthNames = [
   "Januari", "Februari", "Maart", "April", "Mei", "Juni",
