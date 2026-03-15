@@ -107,6 +107,22 @@ export function DeepDiveTab({ securityId, ticker, autoSearching }: DeepDiveTabPr
         </CardContent>
       </Card>
 
+      {/* Auto-analysis progress banner */}
+      {autoSearching && (
+        <Card className="shadow-sm border-primary/20 bg-primary/5">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <div>
+                <p className="text-sm font-medium">Automatische analyse bezig voor {ticker}...</p>
+                <p className="text-xs text-muted-foreground">We zoeken en analyseren relevante bronnen. Dit kan even duren.</p>
+              </div>
+            </div>
+            <Progress value={undefined} className="h-1.5" />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Results list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
