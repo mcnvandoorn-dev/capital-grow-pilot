@@ -56,6 +56,8 @@ export function useDividendIntelligence(
       if (!dividends || dividends.length === 0) {
         return {
           totalAnnualIncome: 0,
+          totalAnnualGross: 0,
+          totalAnnualTax: 0,
           weightedYield: null,
           avgGrowthPct: null,
           securities: [],
