@@ -19,6 +19,7 @@ import { useDeepDive, type DeepDiveItem } from "@/hooks/useDeepDive";
 interface DeepDiveTabProps {
   securityId: string;
   ticker: string;
+  autoSearching?: boolean;
 }
 
 export function DeepDiveTab({ securityId, ticker }: DeepDiveTabProps) {

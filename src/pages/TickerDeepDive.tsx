@@ -317,7 +317,7 @@ export default function TickerDeepDive() {
           </TabsContent>
 
           <TabsContent value="documents">
-            <DeepDiveTab securityId={detail.security.id} ticker={detail.security.ticker} />
+            <DeepDiveTab securityId={detail.security.id} ticker={detail.security.ticker} autoSearching={isSearching} />
           </TabsContent>
 
           <TabsContent value="ai-insights">
