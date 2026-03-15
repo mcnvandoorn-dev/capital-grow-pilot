@@ -122,6 +122,11 @@ export function useDividendCalendar() {
         derivedAmountPerShare = pos.quantity > 0 ? totalAmt / pos.quantity : 0;
       }
 
+      // Calculate average withholding tax rate from history
+      const totalGross = secHistory.reduce((s, h) => s + (h.total_amount ?? 0), 0);
+      const totalTax = secHistory.reduce((s, h) => s + (h.withholding_tax ?? 0), 0);
+      const avgTaxRate = totalGross > 0 ? totalTax / totalGross : 0;
+
       // Calculate pay-date offset from ex-date
       let payDateOffsetDays = 14; // default
       if (latest.pay_date) {
