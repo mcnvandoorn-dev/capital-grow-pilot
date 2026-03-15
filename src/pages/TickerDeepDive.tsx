@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +17,7 @@ import { PriceChart } from "@/components/deepdive/PriceChart";
 import { DividendHistorySection } from "@/components/deepdive/DividendHistorySection";
 import { DeepDiveTab } from "@/components/deepdive/DeepDiveTab";
 import { TickerInsights } from "@/components/deepdive/TickerInsights";
+import { useDeepDive } from "@/hooks/useDeepDive";
 import { ScoreBadge } from "@/components/dashboard/ScoreBadge";
 import { usePortfolios, usePositions } from "@/hooks/usePortfolioData";
 import { useTickerDetail } from "@/hooks/useTickerDetail";
@@ -40,6 +42,9 @@ function formatCurrency(v: number) {
 }
 
 export default function TickerDeepDive() {
+  const [searchParams] = useSearchParams();
+  const securityFromUrl = searchParams.get("security") || undefined;
+
   const { data: portfolios, isLoading: loadingPortfolios } = usePortfolios();
   const portfolioIds = useMemo(
     () => (portfolios ?? []).map((p) => p.id),
@@ -48,12 +53,40 @@ export default function TickerDeepDive() {
   const { data: positions, isLoading: loadingPositions } = usePositions(portfolioIds);
   const { positionWeights } = usePortfolioBreakdown(positions ?? undefined);
 
-  const [selectedSecurityId, setSelectedSecurityId] = useState<string | undefined>();
+  const [selectedSecurityId, setSelectedSecurityId] = useState<string | undefined>(securityFromUrl);
+  const [autoAnalysisTriggered, setAutoAnalysisTriggered] = useState(false);
+
+  // Sync URL param to state when it changes
+  useEffect(() => {
+    if (securityFromUrl && securityFromUrl !== selectedSecurityId) {
+      setSelectedSecurityId(securityFromUrl);
+      setAutoAnalysisTriggered(false);
+    }
+  }, [securityFromUrl]);
 
   const { data: detail, isLoading: loadingDetail } = useTickerDetail(
     selectedSecurityId,
     portfolioIds
   );
+
+  // Deep dive hook for auto-trigger
+  const { items: deepDiveItems, isLoading: loadingDeepDive, isSearching, searchWeb } = useDeepDive(selectedSecurityId);
+
+  // Auto-trigger deep dive analysis when arriving from portfolio click
+  useEffect(() => {
+    if (
+      securityFromUrl &&
+      selectedSecurityId &&
+      detail &&
+      !loadingDeepDive &&
+      !autoAnalysisTriggered &&
+      !isSearching &&
+      deepDiveItems.length === 0
+    ) {
+      setAutoAnalysisTriggered(true);
+      searchWeb(detail.security.ticker);
+    }
+  }, [securityFromUrl, selectedSecurityId, detail, loadingDeepDive, autoAnalysisTriggered, isSearching, deepDiveItems.length]);
 
   const isLoading = loadingPortfolios || loadingPositions;
   const hasPositions = (positions?.length ?? 0) > 0;
