@@ -41,6 +41,9 @@ function formatCurrency(v: number) {
 }
 
 export default function TickerDeepDive() {
+  const [searchParams] = useSearchParams();
+  const securityFromUrl = searchParams.get("security") || undefined;
+
   const { data: portfolios, isLoading: loadingPortfolios } = usePortfolios();
   const portfolioIds = useMemo(
     () => (portfolios ?? []).map((p) => p.id),
@@ -49,7 +52,16 @@ export default function TickerDeepDive() {
   const { data: positions, isLoading: loadingPositions } = usePositions(portfolioIds);
   const { positionWeights } = usePortfolioBreakdown(positions ?? undefined);
 
-  const [selectedSecurityId, setSelectedSecurityId] = useState<string | undefined>();
+  const [selectedSecurityId, setSelectedSecurityId] = useState<string | undefined>(securityFromUrl);
+  const [autoAnalysisTriggered, setAutoAnalysisTriggered] = useState(false);
+
+  // Sync URL param to state when it changes
+  useEffect(() => {
+    if (securityFromUrl && securityFromUrl !== selectedSecurityId) {
+      setSelectedSecurityId(securityFromUrl);
+      setAutoAnalysisTriggered(false);
+    }
+  }, [securityFromUrl]);
 
   const { data: detail, isLoading: loadingDetail } = useTickerDetail(
     selectedSecurityId,
