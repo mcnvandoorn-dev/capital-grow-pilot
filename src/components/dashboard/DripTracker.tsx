@@ -100,8 +100,11 @@ export function DripTracker() {
     const compoundGain = compoundedValue - totalReceived;
     const monthCount = chartData.length;
     const avgMonthly = totalReceived / monthCount;
-    return { totalReceived, compoundedValue, compoundGain, avgMonthly, monthCount };
-  }, [chartData]);
+    // Calculate total gross and tax
+    const totalGross = (dividends ?? []).reduce((s, d) => s + (d.total_amount ?? d.net_amount) * d.fx_rate_to_base, 0);
+    const totalTax = (dividends ?? []).reduce((s, d) => s + (d.withholding_tax ?? 0) * d.fx_rate_to_base, 0);
+    return { totalReceived, compoundedValue, compoundGain, avgMonthly, monthCount, totalGross, totalTax };
+  }, [chartData, dividends]);
 
   if (isLoading) {
     return <Skeleton className="h-[320px] w-full rounded-lg" />;
