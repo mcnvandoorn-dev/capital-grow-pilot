@@ -128,10 +128,21 @@ export function DripTracker() {
     <div className="space-y-4">
       {/* Stats row */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard
             icon={DollarSign}
-            label="Totaal ontvangen"
+            label="Bruto ontvangen"
+            value={formatEur(stats.totalGross)}
+          />
+          <StatCard
+            icon={DollarSign}
+            label="Bronbelasting"
+            value={`-${formatEur(stats.totalTax)}`}
+            warn
+          />
+          <StatCard
+            icon={DollarSign}
+            label="Netto ontvangen"
             value={formatEur(stats.totalReceived)}
           />
           <StatCard
