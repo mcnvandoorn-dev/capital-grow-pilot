@@ -262,8 +262,20 @@ const Index = () => {
       {syncStaleHours !== null && syncStaleHours > 24 && (
         <Alert variant="destructive" className="mb-4 border-amber-500/50 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-500/30 [&>svg]:text-amber-600">
           <AlertTriangle className="h-4 w-4" />
-          <AlertDescription className="text-sm">
-            Laatste IBKR-sync is {Math.floor(syncStaleHours / 24)} dag{Math.floor(syncStaleHours / 24) !== 1 ? "en" : ""} geleden ({lastSyncDate}). Controleer je verbinding in Instellingen.
+          <AlertDescription className="flex items-center justify-between gap-2 text-sm">
+            <span>
+              Laatste IBKR-sync is {Math.floor(syncStaleHours / 24)} dag{Math.floor(syncStaleHours / 24) !== 1 ? "en" : ""} geleden ({lastSyncDate}). Controleer je verbinding in Instellingen.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 border-amber-600/50 text-amber-900 hover:bg-amber-100 dark:border-amber-500/50 dark:text-amber-200 dark:hover:bg-amber-900/40"
+              onClick={handleManualSync}
+              disabled={syncing}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing…" : "Nu synchroniseren"}
+            </Button>
           </AlertDescription>
         </Alert>
       )}
