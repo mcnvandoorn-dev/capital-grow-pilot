@@ -556,16 +556,18 @@ serve(async (req) => {
       }
 
       // Update sync log as success
-      await supabase
-        .from("sync_logs")
-        .update({
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          records_processed: recordsProcessed,
-          records_created: recordsCreated,
-          records_updated: recordsUpdated,
-        })
-        .eq("id", syncLog!.id);
+      if (syncLog) {
+        await supabase
+          .from("sync_logs")
+          .update({
+            status: "completed",
+            completed_at: new Date().toISOString(),
+            records_processed: recordsProcessed,
+            records_created: recordsCreated,
+            records_updated: recordsUpdated,
+          })
+          .eq("id", syncLog.id);
+      }
 
       await supabase
         .from("ibkr_connections")
