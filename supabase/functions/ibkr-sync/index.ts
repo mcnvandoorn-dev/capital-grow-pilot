@@ -169,7 +169,7 @@ serve(async (req) => {
       console.log("Report received, length:", xml.length);
 
       // Create sync log now that we have data to process
-      const { data: syncLog } = await supabase
+      const { data: syncLogData } = await supabase
         .from("sync_logs")
         .insert({
           user_id: user.id,
@@ -179,6 +179,7 @@ serve(async (req) => {
         })
         .select()
         .single();
+      syncLog = syncLogData;
 
       // Extract only the LAST FlexStatement (most recent date) for positions
       // The Flex Query returns 261+ daily statements; we only need the latest
