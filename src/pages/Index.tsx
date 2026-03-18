@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import {
   LayoutDashboard,
   Percent,
   AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,11 +29,12 @@ import {
   useDividendsYTD,
 } from "@/hooks/usePortfolioData";
 import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePrivateInvestments, usePrivateInvestmentMetrics } from "@/hooks/usePrivateInvestments";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
 
 function formatAmount(value: number, currency: "EUR" | "USD") {
   return new Intl.NumberFormat("nl-NL", {
@@ -63,6 +65,24 @@ function useEurToUsd() {
 const Index = () => {
   const { currency } = useDisplayCurrency();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [syncing, setSyncing] = useState(false);
+
+  const handleManualSync = async () => {
+    setSyncing(true);
+    try {
+      const { error } = await supabase.functions.invoke("ibkr-sync");
+      if (error) throw error;
+      toast.success("Sync gestart! Data wordt bijgewerkt.");
+      // Refresh relevant queries
+      queryClient.invalidateQueries({ queryKey: ["last-sync-date"] });
+      queryClient.invalidateQueries({ queryKey: ["ibkr-daily"] });
+    } catch (err: any) {
+      toast.error(`Sync mislukt: ${err.message ?? "onbekende fout"}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
   const { data: eurToUsd } = useEurToUsd();
   const rate = currency === "EUR" ? 1 : (eurToUsd ?? 1);
   const fmt = (v: number) => formatAmount(v * rate, currency);
@@ -242,8 +262,20 @@ const Index = () => {
       {syncStaleHours !== null && syncStaleHours > 24 && (
         <Alert variant="destructive" className="mb-4 border-amber-500/50 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-500/30 [&>svg]:text-amber-600">
           <AlertTriangle className="h-4 w-4" />
-          <AlertDescription className="text-sm">
-            Laatste IBKR-sync is {Math.floor(syncStaleHours / 24)} dag{Math.floor(syncStaleHours / 24) !== 1 ? "en" : ""} geleden ({lastSyncDate}). Controleer je verbinding in Instellingen.
+          <AlertDescription className="flex items-center justify-between gap-2 text-sm">
+            <span>
+              Laatste IBKR-sync is {Math.floor(syncStaleHours / 24)} dag{Math.floor(syncStaleHours / 24) !== 1 ? "en" : ""} geleden ({lastSyncDate}). Controleer je verbinding in Instellingen.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 border-amber-600/50 text-amber-900 hover:bg-amber-100 dark:border-amber-500/50 dark:text-amber-200 dark:hover:bg-amber-900/40"
+              onClick={handleManualSync}
+              disabled={syncing}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing…" : "Nu synchroniseren"}
+            </Button>
           </AlertDescription>
         </Alert>
       )}
