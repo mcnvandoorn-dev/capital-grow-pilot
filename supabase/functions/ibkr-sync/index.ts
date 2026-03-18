@@ -122,7 +122,11 @@ serve(async (req) => {
       .single();
 
     if (connErr || !conn) throw new Error("IBKR connection not found");
-    if (!conn.flex_token || !conn.flex_query_id)
+
+    // Use connection values, fall back to environment secrets
+    const flexToken = conn.flex_token || Deno.env.get("IBKR_FLEX_TOKEN");
+    const flexQueryId = conn.flex_query_id || Deno.env.get("IBKR_QUERY_ID");
+    if (!flexToken || !flexQueryId)
       throw new Error("Flex token or query ID not configured");
 
     // Update connection status
@@ -143,14 +147,14 @@ serve(async (req) => {
         console.log("Reusing existing refCode");
         refCode = existingRefCode;
       } else {
-        const effectiveQueryId = queryIdOverride || conn.flex_query_id;
-        console.log("Using query ID:", queryIdOverride ? "(override)" : "(default)");
-        refCode = await requestFlexReport(conn.flex_token, effectiveQueryId);
+        const effectiveQueryId = queryIdOverride || flexQueryId;
+        console.log("Using query ID:", queryIdOverride ? "(override)" : "(from " + (conn.flex_query_id ? "connection" : "env secret") + ")");
+        refCode = await requestFlexReport(flexToken, effectiveQueryId);
         console.log("New refCode received");
       }
 
       // Step 2: Fetch report XML (returns null if not ready)
-      const xml = await fetchFlexStatement(conn.flex_token, refCode);
+      const xml = await fetchFlexStatement(flexToken, refCode);
       
       if (!xml) {
         // Report not ready yet - return refCode so client can retry
