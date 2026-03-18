@@ -122,7 +122,11 @@ serve(async (req) => {
       .single();
 
     if (connErr || !conn) throw new Error("IBKR connection not found");
-    if (!conn.flex_token || !conn.flex_query_id)
+
+    // Use connection values, fall back to environment secrets
+    const flexToken = conn.flex_token || Deno.env.get("IBKR_FLEX_TOKEN");
+    const flexQueryId = conn.flex_query_id || Deno.env.get("IBKR_QUERY_ID");
+    if (!flexToken || !flexQueryId)
       throw new Error("Flex token or query ID not configured");
 
     // Update connection status
