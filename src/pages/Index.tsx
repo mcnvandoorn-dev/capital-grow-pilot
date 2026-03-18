@@ -65,6 +65,24 @@ function useEurToUsd() {
 const Index = () => {
   const { currency } = useDisplayCurrency();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [syncing, setSyncing] = useState(false);
+
+  const handleManualSync = async () => {
+    setSyncing(true);
+    try {
+      const { error } = await supabase.functions.invoke("ibkr-sync");
+      if (error) throw error;
+      toast.success("Sync gestart! Data wordt bijgewerkt.");
+      // Refresh relevant queries
+      queryClient.invalidateQueries({ queryKey: ["last-sync-date"] });
+      queryClient.invalidateQueries({ queryKey: ["ibkr-daily"] });
+    } catch (err: any) {
+      toast.error(`Sync mislukt: ${err.message ?? "onbekende fout"}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
   const { data: eurToUsd } = useEurToUsd();
   const rate = currency === "EUR" ? 1 : (eurToUsd ?? 1);
   const fmt = (v: number) => formatAmount(v * rate, currency);
