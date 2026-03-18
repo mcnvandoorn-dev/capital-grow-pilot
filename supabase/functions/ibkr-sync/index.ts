@@ -147,9 +147,9 @@ serve(async (req) => {
         console.log("Reusing existing refCode");
         refCode = existingRefCode;
       } else {
-        const effectiveQueryId = queryIdOverride || conn.flex_query_id;
-        console.log("Using query ID:", queryIdOverride ? "(override)" : "(default)");
-        refCode = await requestFlexReport(conn.flex_token, effectiveQueryId);
+        const effectiveQueryId = queryIdOverride || flexQueryId;
+        console.log("Using query ID:", queryIdOverride ? "(override)" : "(from " + (conn.flex_query_id ? "connection" : "env secret") + ")");
+        refCode = await requestFlexReport(flexToken, effectiveQueryId);
         console.log("New refCode received");
       }
 
