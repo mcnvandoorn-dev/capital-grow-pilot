@@ -134,6 +134,7 @@ serve(async (req) => {
     let recordsProcessed = 0;
     let recordsCreated = 0;
     let recordsUpdated = 0;
+    let syncLog: any = null;
 
     try {
       // Step 1: Request report (or reuse existing refCode)
