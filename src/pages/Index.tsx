@@ -71,10 +71,21 @@ const Index = () => {
   const handleManualSync = async () => {
     setSyncing(true);
     try {
-      const { error } = await supabase.functions.invoke("ibkr-sync");
+      // Get the user's IBKR connection
+      const { data: connections, error: connErr } = await supabase
+        .from("ibkr_connections")
+        .select("id")
+        .limit(1);
+      if (connErr) throw connErr;
+      if (!connections || connections.length === 0) {
+        toast.error("Geen IBKR-verbinding gevonden. Configureer er een in Instellingen.");
+        return;
+      }
+      const { error } = await supabase.functions.invoke("ibkr-sync", {
+        body: { connectionId: connections[0].id },
+      });
       if (error) throw error;
       toast.success("Sync gestart! Data wordt bijgewerkt.");
-      // Refresh relevant queries
       queryClient.invalidateQueries({ queryKey: ["last-sync-date"] });
       queryClient.invalidateQueries({ queryKey: ["ibkr-daily"] });
     } catch (err: any) {

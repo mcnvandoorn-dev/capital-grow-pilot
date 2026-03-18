@@ -134,6 +134,7 @@ serve(async (req) => {
     let recordsProcessed = 0;
     let recordsCreated = 0;
     let recordsUpdated = 0;
+    let syncLog: any = null;
 
     try {
       // Step 1: Request report (or reuse existing refCode)
@@ -168,7 +169,7 @@ serve(async (req) => {
       console.log("Report received, length:", xml.length);
 
       // Create sync log now that we have data to process
-      const { data: syncLog } = await supabase
+      const { data: syncLogData } = await supabase
         .from("sync_logs")
         .insert({
           user_id: user.id,
@@ -178,6 +179,7 @@ serve(async (req) => {
         })
         .select()
         .single();
+      syncLog = syncLogData;
 
       // Extract only the LAST FlexStatement (most recent date) for positions
       // The Flex Query returns 261+ daily statements; we only need the latest
@@ -554,16 +556,18 @@ serve(async (req) => {
       }
 
       // Update sync log as success
-      await supabase
-        .from("sync_logs")
-        .update({
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          records_processed: recordsProcessed,
-          records_created: recordsCreated,
-          records_updated: recordsUpdated,
-        })
-        .eq("id", syncLog!.id);
+      if (syncLog) {
+        await supabase
+          .from("sync_logs")
+          .update({
+            status: "completed",
+            completed_at: new Date().toISOString(),
+            records_processed: recordsProcessed,
+            records_created: recordsCreated,
+            records_updated: recordsUpdated,
+          })
+          .eq("id", syncLog.id);
+      }
 
       await supabase
         .from("ibkr_connections")
