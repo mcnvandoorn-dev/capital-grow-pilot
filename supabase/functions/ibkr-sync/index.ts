@@ -154,7 +154,7 @@ serve(async (req) => {
       }
 
       // Step 2: Fetch report XML (returns null if not ready)
-      const xml = await fetchFlexStatement(conn.flex_token, refCode);
+      const xml = await fetchFlexStatement(flexToken, refCode);
       
       if (!xml) {
         // Report not ready yet - return refCode so client can retry
