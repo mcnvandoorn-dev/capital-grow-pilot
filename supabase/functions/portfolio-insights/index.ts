@@ -31,8 +31,28 @@ serve(async (req) => {
       });
     }
 
-    const { assetType, sector, region, currency, dividendVsGrowth, topPositions } =
-      await req.json();
+    // Payload size check
+    const rawText = await req.text();
+    if (rawText.length > 500_000) {
+      return new Response(JSON.stringify({ error: "Payload too large" }), {
+        status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let body: any;
+    try { body = JSON.parse(rawText); } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { assetType, sector, region, currency, dividendVsGrowth, topPositions } = body;
+
+    if (!assetType || typeof assetType !== "object") {
+      return new Response(JSON.stringify({ error: "Missing or invalid assetType" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");

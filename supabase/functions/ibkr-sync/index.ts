@@ -110,8 +110,25 @@ serve(async (req) => {
     } = await anonClient.auth.getUser(authHeader.replace("Bearer ", ""));
     if (authError || !user) throw new Error("Unauthorized");
 
-    const { connectionId, refCode: existingRefCode, queryIdOverride } = await req.json();
-    if (!connectionId) throw new Error("Missing connectionId");
+    // Payload size check
+    const rawText = await req.text();
+    if (rawText.length > 10_000) {
+      return new Response(JSON.stringify({ success: false, error: "Payload too large" }), {
+        status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let reqBody: any;
+    try { reqBody = JSON.parse(rawText); } catch {
+      return new Response(JSON.stringify({ success: false, error: "Invalid JSON" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { connectionId, refCode: existingRefCode, queryIdOverride } = reqBody;
+    if (!connectionId || typeof connectionId !== "string") throw new Error("Missing or invalid connectionId");
+    if (existingRefCode && typeof existingRefCode !== "string") throw new Error("Invalid refCode");
+    if (queryIdOverride && typeof queryIdOverride !== "string") throw new Error("Invalid queryIdOverride");
 
     // Get IBKR connection
     const { data: conn, error: connErr } = await supabase
