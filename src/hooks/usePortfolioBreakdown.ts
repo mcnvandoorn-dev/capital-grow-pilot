@@ -149,7 +149,7 @@ export function usePortfolioBreakdown(
         value: equity,
         keys: {
           assetType: `Privaat: ${inv.asset_type}`,
-          sector: inv.sector_label ?? "Overig",
+          sector: inv.sector_label ?? (inv.asset_type === "private_equity" ? "Private Equity" : inv.asset_type === "real_estate" ? "Real Estate" : "Overig"),
           region: geoLabel,
           country: geoLabel,
           currency: inv.currency,
