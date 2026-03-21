@@ -43,6 +43,13 @@ export interface PositionWithDetails {
   unrealized_pnl_pct: number | null;
 }
 
+interface ReconstructedCostBasis {
+  avgCost: number;
+  totalCost: number;
+  matchedQuantity: number;
+  isReliable: boolean;
+}
+
 export function usePositions(portfolioIds: string[]) {
   return useQuery({
     queryKey: ["positions", portfolioIds],
@@ -109,38 +116,55 @@ export function usePositions(portfolioIds: string[]) {
 
       // Check if positions have zero cost basis — if so, compute from transactions
       const hasZeroCost = positions.some((p) => p.total_cost_basis === 0 && p.quantity > 0);
-      const txCostMap = new Map<string, { avgCost: number; totalCost: number }>();
+      const txCostMap = new Map<string, ReconstructedCostBasis>();
 
       if (hasZeroCost) {
         // Fetch all BUY and SELL transactions for these portfolios
         const { data: txns } = await supabase
           .from("transactions")
-          .select("security_id, transaction_type, quantity, price, currency, fx_rate_to_base")
+          .select("portfolio_id, security_id, transaction_type, quantity, price, commission")
           .in("portfolio_id", portfolioIds)
           .in("transaction_type", ["BUY", "SELL"])
           .order("trade_date", { ascending: true });
 
         if (txns) {
-          // Build cost basis per security using FIFO-like average cost
+          // Reconstruct cost basis only when transaction history matches the current position.
+          // Some imported positions exist without complete trade history, which would otherwise
+          // understate cost basis and massively overstate unrealized profit.
           const secAgg = new Map<string, { qty: number; totalCost: number }>();
           for (const tx of txns) {
-            const entry = secAgg.get(tx.security_id) ?? { qty: 0, totalCost: 0 };
+            const key = `${tx.portfolio_id}:${tx.security_id}`;
+            const entry = secAgg.get(key) ?? { qty: 0, totalCost: 0 };
             if (tx.transaction_type === "BUY") {
               entry.qty += tx.quantity;
-              entry.totalCost += tx.quantity * tx.price;
+              entry.totalCost += tx.quantity * tx.price + (tx.commission ?? 0);
             } else {
               // SELL: reduce proportionally
               const avgCostPerUnit = entry.qty > 0 ? entry.totalCost / entry.qty : 0;
               entry.qty = Math.max(0, entry.qty - tx.quantity);
               entry.totalCost = entry.qty * avgCostPerUnit;
             }
-            secAgg.set(tx.security_id, entry);
+            secAgg.set(key, entry);
           }
-          for (const [secId, agg] of secAgg) {
+
+          const positionQtyMap = new Map<string, number>();
+          for (const pos of positions) {
+            positionQtyMap.set(`${pos.portfolio_id}:${pos.security_id}`, pos.quantity);
+          }
+
+          for (const [key, agg] of secAgg) {
+            const currentQty = positionQtyMap.get(key);
+            if (!currentQty || currentQty <= 0 || agg.qty <= 0) continue;
+
+            const qtyDiff = Math.abs(agg.qty - currentQty);
+            const isReliable = qtyDiff <= Math.max(0.0001, currentQty * 0.01);
+
             if (agg.qty > 0) {
-              txCostMap.set(secId, {
+              txCostMap.set(key, {
                 avgCost: agg.totalCost / agg.qty,
                 totalCost: agg.totalCost,
+                matchedQuantity: agg.qty,
+                isReliable,
               });
             }
           }
@@ -152,23 +176,26 @@ export function usePositions(portfolioIds: string[]) {
         const sec = pos.securities as any;
         const price = priceMap.get(pos.security_id) ?? null;
         const fxRate = fxMap.get(pos.currency) ?? 1;
+        const txCostKey = `${pos.portfolio_id}:${pos.security_id}`;
+        const reconstructedCost = txCostMap.get(txCostKey);
 
-        // Use transaction-derived cost basis if position cost is 0
+        // Use transaction-derived cost basis only if it fully matches the live position.
         let avgCostBasis = pos.avg_cost_basis;
         let totalCostBasis = pos.total_cost_basis;
-        if (totalCostBasis === 0 && txCostMap.has(pos.security_id)) {
-          const txCost = txCostMap.get(pos.security_id)!;
-          avgCostBasis = txCost.avgCost;
-          totalCostBasis = txCost.totalCost;
+        const hasStoredCostBasis = totalCostBasis > 0 && avgCostBasis > 0;
+
+        if (!hasStoredCostBasis && reconstructedCost?.isReliable) {
+          avgCostBasis = reconstructedCost.avgCost;
+          totalCostBasis = reconstructedCost.totalCost;
         }
 
         // market_value in local currency, then convert to EUR
         const localMarketValue = price !== null ? price * pos.quantity : null;
         const marketValue =
           localMarketValue !== null ? localMarketValue * fxRate : null;
-        const costInEur = totalCostBasis * fxRate;
+        const costInEur = totalCostBasis > 0 ? totalCostBasis * fxRate : 0;
         const unrealizedPnl =
-          marketValue !== null ? marketValue - costInEur : null;
+          marketValue !== null && costInEur > 0 ? marketValue - costInEur : null;
         const unrealizedPnlPct =
           unrealizedPnl !== null && costInEur > 0
             ? (unrealizedPnl / costInEur) * 100
