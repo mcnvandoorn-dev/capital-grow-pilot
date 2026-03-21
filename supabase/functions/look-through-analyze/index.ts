@@ -52,12 +52,44 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    const { securities } = (await req.json()) as { securities: SecurityInput[] };
-    if (!securities?.length) {
+    // Payload size check
+    const rawText = await req.text();
+    if (rawText.length > 500_000) {
+      return new Response(JSON.stringify({ error: "Payload too large" }), {
+        status: 413,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let parsedBody: any;
+    try { parsedBody = JSON.parse(rawText); } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { securities } = parsedBody as { securities: SecurityInput[] };
+    if (!Array.isArray(securities) || !securities.length) {
       return new Response(JSON.stringify({ error: "No securities provided" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+    if (securities.length > 200) {
+      return new Response(JSON.stringify({ error: "Too many securities (max 200)" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // Validate each security has required fields
+    for (const s of securities) {
+      if (!s.security_id || typeof s.security_id !== "string" || !s.ticker || typeof s.ticker !== "string") {
+        return new Response(JSON.stringify({ error: "Invalid security: missing security_id or ticker" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Check which securities already have fresh exposure data (< 7 days old)

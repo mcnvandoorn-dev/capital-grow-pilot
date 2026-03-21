@@ -31,7 +31,33 @@ serve(async (req) => {
       });
     }
 
-    const { preferences, portfolio } = await req.json();
+    // Payload size check
+    const rawText = await req.text();
+    if (rawText.length > 1_000_000) {
+      return new Response(JSON.stringify({ error: "Payload too large" }), {
+        status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let body: any;
+    try { body = JSON.parse(rawText); } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { preferences, portfolio } = body;
+
+    if (!preferences || typeof preferences !== "object" || !portfolio || typeof portfolio !== "object") {
+      return new Response(JSON.stringify({ error: "Missing preferences or portfolio" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!Array.isArray(preferences.targetSectors)) preferences.targetSectors = [];
+    if (!Array.isArray(preferences.targetRegions)) preferences.targetRegions = [];
+    // Truncate string fields to prevent prompt injection via oversized content
+    if (typeof preferences.primaryGoal === "string") preferences.primaryGoal = preferences.primaryGoal.slice(0, 200);
+    if (typeof preferences.investmentStyle === "string") preferences.investmentStyle = preferences.investmentStyle.slice(0, 200);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");

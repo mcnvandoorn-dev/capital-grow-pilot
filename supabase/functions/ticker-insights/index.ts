@@ -31,12 +31,42 @@ serve(async (req) => {
       });
     }
 
-    const body = await req.json();
+    // Payload size check
+    const rawText = await req.text();
+    if (rawText.length > 500_000) {
+      return new Response(JSON.stringify({ error: "Payload too large" }), {
+        status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let body: any;
+    try { body = JSON.parse(rawText); } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const {
       ticker, name, assetClass, sector, industry,
       fundamentals, scores, dividendCount, rocCount,
       position, portfolioHoldings,
     } = body;
+
+    if (!ticker || typeof ticker !== "string") {
+      return new Response(JSON.stringify({ error: "Missing or invalid ticker" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!position || typeof position !== "object") {
+      return new Response(JSON.stringify({ error: "Missing position data" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (Array.isArray(portfolioHoldings) && portfolioHoldings.length > 500) {
+      return new Response(JSON.stringify({ error: "Too many portfolio holdings" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
