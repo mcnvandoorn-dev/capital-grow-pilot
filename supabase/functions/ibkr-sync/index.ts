@@ -245,8 +245,13 @@ serve(async (req) => {
 
           const key = `${op.symbol}|${op.accountId || ""}`;
           const existing = posAgg.get(key);
-          const cost = parseNum(op.costBasisMoney);
           const mark = parseNum(op.markPrice);
+
+          // IBKR uses various field names for cost basis depending on Flex Query config
+          let cost = parseNum(op.costBasisMoney);
+          if (cost === 0) cost = parseNum(op.costBasisPrice) * qty;
+          if (cost === 0) cost = parseNum(op.costPrice) * qty;
+          if (cost === 0) cost = parseNum(op.openPrice) * qty;
 
           if (existing) {
             existing.totalQty += qty;
@@ -288,6 +293,21 @@ serve(async (req) => {
               }
             }
           } catch { console.warn("Could not fetch USD→EUR rate"); }
+        }
+
+        // Log first position's available fields for debugging
+        if (openPositions.length > 0) {
+          const sample = openPositions[0];
+          console.log("Sample OpenPosition fields:", Object.keys(sample).join(", "));
+          console.log("Sample cost fields:", JSON.stringify({
+            costBasisMoney: sample.costBasisMoney,
+            costBasisPrice: sample.costBasisPrice,
+            costPrice: sample.costPrice,
+            openPrice: sample.openPrice,
+            markPrice: sample.markPrice,
+            position: sample.position,
+            quantity: sample.quantity,
+          }));
         }
 
         console.log("Aggregated to unique positions:", posAgg.size);
@@ -462,6 +482,11 @@ serve(async (req) => {
       // Step 7: If no open positions were found, recalculate from transactions
       if (openPositions.length === 0) {
         await recalculatePositions(supabase, user.id);
+      }
+
+      // Step 8: Backfill cost basis from transactions for positions that have 0 cost
+      if (openPositions.length > 0) {
+        await backfillCostBasisFromTransactions(supabase, user.id);
       }
 
       // Update sync log as success
@@ -773,6 +798,77 @@ async function recalculatePositions(supabase: any, userId: string) {
           currency: pos.currency,
         });
       }
+    }
+  }
+}
+
+async function backfillCostBasisFromTransactions(supabase: any, userId: string) {
+  const { data: portfolios } = await supabase
+    .from("portfolios")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("is_active", true);
+
+  if (!portfolios || portfolios.length === 0) return;
+
+  const portfolioIds = portfolios.map((p: any) => p.id);
+
+  const { data: zeroCostPositions } = await supabase
+    .from("positions")
+    .select("id, portfolio_id, security_id, quantity")
+    .in("portfolio_id", portfolioIds)
+    .eq("total_cost_basis", 0)
+    .gt("quantity", 0);
+
+  if (!zeroCostPositions || zeroCostPositions.length === 0) {
+    console.log("No zero-cost positions to backfill");
+    return;
+  }
+
+  console.log(`Backfilling cost basis for ${zeroCostPositions.length} positions from transactions`);
+
+  for (const pos of zeroCostPositions) {
+    const { data: txns } = await supabase
+      .from("transactions")
+      .select("transaction_type, quantity, price, commission")
+      .eq("portfolio_id", pos.portfolio_id)
+      .eq("security_id", pos.security_id)
+      .in("transaction_type", ["BUY", "SELL"])
+      .order("trade_date", { ascending: true });
+
+    if (!txns || txns.length === 0) continue;
+
+    let qty = 0;
+    let totalCost = 0;
+
+    for (const tx of txns) {
+      if (tx.transaction_type === "BUY") {
+        qty += tx.quantity;
+        totalCost += tx.quantity * tx.price + Math.abs(tx.commission || 0);
+      } else {
+        const avgCostPerUnit = qty > 0 ? totalCost / qty : 0;
+        qty = Math.max(0, qty - tx.quantity);
+        totalCost = qty * avgCostPerUnit;
+      }
+    }
+
+    if (qty <= 0 || totalCost <= 0) continue;
+
+    const qtyDiff = Math.abs(qty - pos.quantity);
+    const tolerance = Math.max(0.01, pos.quantity * 0.02);
+
+    if (qtyDiff <= tolerance) {
+      const avgCost = Math.round((totalCost / qty) * 10000) / 10000;
+      const roundedTotal = Math.round(totalCost * 100) / 100;
+
+      await supabase
+        .from("positions")
+        .update({ avg_cost_basis: avgCost, total_cost_basis: roundedTotal })
+        .eq("id", pos.id);
+
+      console.log(`Backfilled ${pos.security_id}: avgCost=${avgCost}, total=${roundedTotal} (txQty=${qty.toFixed(2)}, posQty=${pos.quantity})`);
+    } else {
+      console.log(`Skipped ${pos.security_id}: txQty=${qty.toFixed(2)} vs posQty=${pos.quantity} (diff=${qtyDiff.toFixed(2)} > tol=${tolerance.toFixed(2)})`);
     }
   }
 }
