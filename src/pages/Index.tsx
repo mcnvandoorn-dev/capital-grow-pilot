@@ -270,7 +270,7 @@ const Index = () => {
   return (
     <AppLayout title="Portfolio" subtitle="Overzicht van al je strategieën samen" actions={<CurrencyToggle />}>
       {/* Sync staleness warning */}
-      {syncStaleHours !== null && syncStaleHours > 24 && (
+      {syncStaleHours !== null && syncStaleHours > 24 * 7 && (
         <Alert variant="destructive" className="mb-4 border-amber-500/50 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-500/30 [&>svg]:text-amber-600">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between gap-2 text-sm">
