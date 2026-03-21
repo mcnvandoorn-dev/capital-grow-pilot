@@ -245,8 +245,13 @@ serve(async (req) => {
 
           const key = `${op.symbol}|${op.accountId || ""}`;
           const existing = posAgg.get(key);
-          const cost = parseNum(op.costBasisMoney);
           const mark = parseNum(op.markPrice);
+
+          // IBKR uses various field names for cost basis depending on Flex Query config
+          let cost = parseNum(op.costBasisMoney);
+          if (cost === 0) cost = parseNum(op.costBasisPrice) * qty;
+          if (cost === 0) cost = parseNum(op.costPrice) * qty;
+          if (cost === 0) cost = parseNum(op.openPrice) * qty;
 
           if (existing) {
             existing.totalQty += qty;
@@ -288,6 +293,21 @@ serve(async (req) => {
               }
             }
           } catch { console.warn("Could not fetch USD→EUR rate"); }
+        }
+
+        // Log first position's available fields for debugging
+        if (openPositions.length > 0) {
+          const sample = openPositions[0];
+          console.log("Sample OpenPosition fields:", Object.keys(sample).join(", "));
+          console.log("Sample cost fields:", JSON.stringify({
+            costBasisMoney: sample.costBasisMoney,
+            costBasisPrice: sample.costBasisPrice,
+            costPrice: sample.costPrice,
+            openPrice: sample.openPrice,
+            markPrice: sample.markPrice,
+            position: sample.position,
+            quantity: sample.quantity,
+          }));
         }
 
         console.log("Aggregated to unique positions:", posAgg.size);
