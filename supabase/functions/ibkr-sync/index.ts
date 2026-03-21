@@ -203,197 +203,27 @@ serve(async (req) => {
       syncLog = syncLogData;
 
       // Extract only the LAST FlexStatement (most recent date) for positions
-      // The Flex Query returns 261+ daily statements; we only need the latest
       const lastStatementIdx = xml.lastIndexOf("<FlexStatement ");
       const lastStatementXml = lastStatementIdx >= 0 ? xml.substring(lastStatementIdx) : xml;
       console.log("Last statement XML length:", lastStatementXml.length);
 
-      // Step 3: Parse trades (from ALL statements - we want full history)
-      const trades = extractAttributes(xml, "Trade");
-      for (const t of trades) {
-        recordsProcessed++;
-        if (!t.symbol || !t.tradeDate) continue;
-
-        // Upsert security
-        const assetClass = mapAssetClass(t.assetCategory, t.description, t.symbol);
-        const sectorInfo = mapSectorIndustry(t.symbol, assetClass);
-        const { data: sec } = await supabase
-          .from("securities")
-          .upsert(
-            {
-              ticker: t.symbol,
-              name: t.description || null,
-              conid: t.conid || null,
-              exchange: t.listingExchange || t.exchange || null,
-              currency: (t.currency as any) || "USD",
-              asset_class: assetClass,
-              isin: t.isin || null,
-              ...(sectorInfo ? { sector: sectorInfo.sector, industry: sectorInfo.industry } : {}),
-            },
-            { onConflict: "ticker,exchange" }
-          )
-          .select("id")
-          .single();
-
-        if (!sec) {
-          console.log("Failed to upsert security for trade:", t.symbol);
-          continue;
-        }
-
-        // Find or get portfolio
-        const portfolioId = await getOrCreatePortfolio(
-          supabase,
-          user.id,
-          conn.id,
-          t.accountId || null,
-          (t.currency as any) || "USD"
-        );
-
-        // Check if trade already exists
-        if (t.tradeID) {
-          const { data: existing } = await supabase
-            .from("transactions")
-            .select("id")
-            .eq("ibkr_trade_id", t.tradeID)
-            .maybeSingle();
-
-          if (existing) {
-            recordsUpdated++;
-            continue;
-          }
-        }
-
-        const qty = parseNum(t.quantity);
-        const price = parseNum(t.tradePrice || t.price);
-        const commission = parseNum(t.ibCommission || t.commission);
-        const grossAmount = parseNum(t.proceeds || String(qty * price));
-        const netAmount = grossAmount + commission;
-        const fxRate = parseNum(t.fxRateToBase) || 1;
-
-        const txType = qty > 0 ? "BUY" : "SELL";
-
-        const { error: txErr } = await supabase.from("transactions").insert({
-          portfolio_id: portfolioId,
-          security_id: sec.id,
-          transaction_type: txType,
-          trade_date: formatDate(t.tradeDate),
-          settlement_date: t.settleDateTarget
-            ? formatDate(t.settleDateTarget)
-            : null,
-          quantity: Math.abs(qty),
-          price: Math.abs(price),
-          commission: Math.abs(commission),
-          gross_amount: Math.abs(grossAmount),
-          net_amount: Math.abs(netAmount),
-          currency: (t.currency as any) || "USD",
-          fx_rate_to_base: fxRate,
-          ibkr_trade_id: t.tradeID || null,
-          sync_source: "FLEX_QUERY",
-        });
-
-        if (!txErr) recordsCreated++;
-      }
-
-      // Step 4: Parse dividends (CashTransaction with type Dividends/Payment In Lieu Of Dividends)
-      const cashTxns = extractAttributes(xml, "CashTransaction");
-      for (const ct of cashTxns) {
-        const ctType = (ct.type || "").toLowerCase();
-        if (
-          !ctType.includes("dividend") &&
-          !ctType.includes("payment in lieu")
-        )
-          continue;
-
-        recordsProcessed++;
-        if (!ct.symbol || !ct.dateTime) continue;
-
-        const { data: sec } = await supabase
-          .from("securities")
-          .select("id")
-          .eq("ticker", ct.symbol)
-          .maybeSingle();
-
-        if (!sec) continue;
-
-        const portfolioId = await getOrCreatePortfolio(
-          supabase,
-          user.id,
-          conn.id,
-          ct.accountId || null,
-          (ct.currency as any) || "USD"
-        );
-
-        const amount = parseNum(ct.amount);
-        const tax = parseNum(ct.tax);
-        const fxRate = parseNum(ct.fxRateToBase) || 1;
-        const isRoc = ctType.includes("return of capital");
-        const exDate = formatDate(ct.reportDate || ct.dateTime);
-
-        // Check duplicate by security + date + amount
-        const { data: existing } = await supabase
-          .from("dividend_history")
-          .select("id")
-          .eq("security_id", sec.id)
-          .eq("portfolio_id", portfolioId)
-          .eq("ex_date", exDate)
-          .maybeSingle();
-
-        if (existing) {
-          recordsUpdated++;
-          continue;
-        }
-
-        const totalAmount = Math.abs(amount);
-        const withholdingTax = Math.abs(tax);
-
-        await supabase.from("dividend_history").insert({
-          portfolio_id: portfolioId,
-          security_id: sec.id,
-          ex_date: exDate,
-          total_amount: totalAmount,
-          withholding_tax: withholdingTax,
-          net_amount: totalAmount - withholdingTax,
-          amount_per_share: 0, // Will be recalculated
-          currency: (ct.currency as any) || "USD",
-          fx_rate_to_base: fxRate,
-          is_roc: isRoc,
-          sync_source: "FLEX_QUERY",
-        });
-
-        recordsCreated++;
-      }
-
-      // Step 5: Import OpenPositions from LAST statement only (most recent date)
-      const openPositions = extractAttributes(lastStatementXml, "OpenPosition");
-      console.log("Open positions found:", openPositions.length);
-
       // Detect the base currency of the last FlexStatement
       const stmtAttrs = extractAttributes(lastStatementXml, "FlexStatement");
       const statementBaseCurrency = stmtAttrs.length > 0 ? stmtAttrs[0].baseCurrency : null;
-      console.log("Base currency detected:", statementBaseCurrency ? "yes" : "no");
+
+      // ─── STEP 3: POSITIONS FIRST (most critical) ───
+      const openPositions = extractAttributes(lastStatementXml, "OpenPosition");
+      console.log("Open positions found:", openPositions.length);
 
       if (openPositions.length > 0) {
-        // Aggregate multiple lots per symbol into single positions
         const posAgg = new Map<string, {
-          symbol: string;
-          description: string | null;
-          conid: string | null;
-          exchange: string | null;
-          currency: string;
-          assetCategory: string | undefined;
-          isin: string | null;
-          accountId: string | null;
-          totalQty: number;
-          totalCost: number;
-          weightedPrice: number; // qty-weighted mark price
+          symbol: string; description: string | null; conid: string | null;
+          exchange: string | null; currency: string; assetCategory: string | undefined;
+          isin: string | null; accountId: string | null;
+          totalQty: number; totalCost: number; weightedPrice: number;
         }>();
 
-        // Collect FX rates from positions per account
-        // Key: "currency|accountId", value: { rate, accountBaseCurrency }
         const fxRatesMap = new Map<string, number>();
-
-        // We need to collect rates per FlexStatement (each has its own baseCurrency)
-        // Parse ALL FlexStatements to get baseCurrency per account
         const allStatements = extractAttributes(xml, "FlexStatement");
         const accountBaseCurrencyMap = new Map<string, string>();
         for (const stmt of allStatements) {
@@ -401,14 +231,12 @@ serve(async (req) => {
             accountBaseCurrencyMap.set(stmt.accountId, stmt.baseCurrency);
           }
         }
-        console.log("Account base currencies found:", accountBaseCurrencyMap.size);
 
         for (const op of openPositions) {
           if (!op.symbol) continue;
           const qty = parseNum(op.position || op.quantity);
           if (qty <= 0) continue;
 
-          // Only capture FX rates from EUR-based accounts (fxRateToBase = X→EUR)
           const accountBase = accountBaseCurrencyMap.get(op.accountId || "") || statementBaseCurrency;
           const fxRate = parseNum(op.fxRateToBase);
           if (fxRate > 0 && op.currency && accountBase === "EUR") {
@@ -426,41 +254,25 @@ serve(async (req) => {
             existing.weightedPrice += mark * qty;
           } else {
             posAgg.set(key, {
-              symbol: op.symbol,
-              description: op.description || null,
-              conid: op.conid || null,
-              exchange: op.listingExchange || op.exchange || null,
-              currency: op.currency || "USD",
-              assetCategory: op.assetCategory,
-              isin: op.isin || null,
-              accountId: op.accountId || null,
-              totalQty: qty,
-              totalCost: cost,
-              weightedPrice: mark * qty,
+              symbol: op.symbol, description: op.description || null,
+              conid: op.conid || null, exchange: op.listingExchange || op.exchange || null,
+              currency: op.currency || "USD", assetCategory: op.assetCategory,
+              isin: op.isin || null, accountId: op.accountId || null,
+              totalQty: qty, totalCost: cost, weightedPrice: mark * qty,
             });
           }
         }
 
-        // Store FX rates in fx_rates table (only EUR-based rates)
+        // Store FX rates
         const today = new Date().toISOString().split("T")[0];
         for (const [currency, rate] of fxRatesMap) {
-          if (currency === "EUR") continue; // No conversion needed for base
-          await supabase
-            .from("fx_rates")
-            .upsert(
-              {
-                from_currency: currency as any,
-                to_currency: "EUR" as any,
-                rate: Math.round(rate * 1000000) / 1000000,
-                rate_date: today,
-                source: "IBKR",
-              },
-              { onConflict: "from_currency,to_currency,rate_date" }
-            );
-          console.log(`Stored FX rate: ${currency}/EUR`);
+          if (currency === "EUR") continue;
+          await supabase.from("fx_rates").upsert(
+            { from_currency: currency as any, to_currency: "EUR" as any, rate: Math.round(rate * 1000000) / 1000000, rate_date: today, source: "IBKR" },
+            { onConflict: "from_currency,to_currency,rate_date" }
+          );
         }
 
-        // If no EUR-based account found, fetch real USD→EUR rate from external API
         if (!fxRatesMap.has("USD")) {
           try {
             const fxRes = await fetch("https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR");
@@ -468,70 +280,41 @@ serve(async (req) => {
               const fxJson = await fxRes.json();
               const usdToEur = fxJson.rates?.EUR;
               if (usdToEur && typeof usdToEur === "number") {
-                console.log("Fetched real USD→EUR rate successfully");
                 await supabase.from("fx_rates").upsert(
-                  {
-                    from_currency: "USD" as any,
-                    to_currency: "EUR" as any,
-                    rate: Math.round(usdToEur * 1000000) / 1000000,
-                    rate_date: today,
-                    source: "FRANKFURTER",
-                  },
+                  { from_currency: "USD" as any, to_currency: "EUR" as any, rate: Math.round(usdToEur * 1000000) / 1000000, rate_date: today, source: "FRANKFURTER" },
                   { onConflict: "from_currency,to_currency,rate_date" }
                 );
                 fxRatesMap.set("USD", usdToEur);
               }
             }
-          } catch (fxErr) {
-            console.warn("Could not fetch USD→EUR rate");
-          }
+          } catch { console.warn("Could not fetch USD→EUR rate"); }
         }
 
         console.log("Aggregated to unique positions:", posAgg.size);
         recordsProcessed += openPositions.length;
 
-        // Process aggregated positions
         for (const [, agg] of posAgg) {
-          // Upsert security
           const assetClass = mapAssetClass(agg.assetCategory, agg.description, agg.symbol);
           const sectorInfo = mapSectorIndustry(agg.symbol, assetClass);
           const { data: sec } = await supabase
             .from("securities")
-            .upsert(
-              {
-                ticker: agg.symbol,
-                name: agg.description,
-                conid: agg.conid,
-                exchange: agg.exchange,
-                currency: agg.currency as any,
-                asset_class: assetClass,
-                isin: agg.isin,
-                ...(sectorInfo ? { sector: sectorInfo.sector, industry: sectorInfo.industry } : {}),
-              },
-            { onConflict: "ticker,exchange" }
-          )
-          .select("id")
-          .single();
+            .upsert({
+              ticker: agg.symbol, name: agg.description, conid: agg.conid,
+              exchange: agg.exchange, currency: agg.currency as any,
+              asset_class: assetClass, isin: agg.isin,
+              ...(sectorInfo ? { sector: sectorInfo.sector, industry: sectorInfo.industry } : {}),
+            }, { onConflict: "ticker,exchange" })
+            .select("id").single();
 
-        if (!sec) {
-          console.log("Failed to upsert security for position:", agg.symbol);
-          continue;
-        }
+          if (!sec) continue;
 
-          const portfolioId = await getOrCreatePortfolio(
-            supabase, user.id, conn.id, agg.accountId, agg.currency
-          );
-
+          const portfolioId = await getOrCreatePortfolio(supabase, user.id, conn.id, agg.accountId, agg.currency);
           const avgCost = agg.totalQty > 0 ? Math.round((agg.totalCost / agg.totalQty) * 10000) / 10000 : 0;
           const markPrice = agg.totalQty > 0 ? agg.weightedPrice / agg.totalQty : 0;
 
-          // Upsert position
           const { data: existingPos } = await supabase
-            .from("positions")
-            .select("id")
-            .eq("portfolio_id", portfolioId)
-            .eq("security_id", sec.id)
-            .maybeSingle();
+            .from("positions").select("id")
+            .eq("portfolio_id", portfolioId).eq("security_id", sec.id).maybeSingle();
 
           const posData = {
             quantity: agg.totalQty,
@@ -545,33 +328,138 @@ serve(async (req) => {
             recordsUpdated++;
           } else {
             await supabase.from("positions").insert({
-              portfolio_id: portfolioId,
-              security_id: sec.id,
-              currency: agg.currency as any,
-              ...posData,
+              portfolio_id: portfolioId, security_id: sec.id,
+              currency: agg.currency as any, ...posData,
             });
             recordsCreated++;
           }
 
-          // Store market price
           if (markPrice > 0) {
             const today = new Date().toISOString().split("T")[0];
-            await supabase
-              .from("market_data")
-              .upsert(
-                {
-                  security_id: sec.id,
-                  data_date: today,
-                  close_price: Math.round(markPrice * 10000) / 10000,
-                  market_price: Math.round(markPrice * 10000) / 10000,
-                },
-                { onConflict: "security_id,data_date" }
-              );
+            await supabase.from("market_data").upsert(
+              { security_id: sec.id, data_date: today, close_price: Math.round(markPrice * 10000) / 10000, market_price: Math.round(markPrice * 10000) / 10000 },
+              { onConflict: "security_id,data_date" }
+            );
           }
         }
       }
 
-      // Step 6: If no open positions were found, recalculate from transactions
+      console.log(`Positions done: ${recordsCreated} created, ${recordsUpdated} updated`);
+
+      // ─── STEP 4: ACCOUNT SUMMARY ───
+      const equitySummary = extractAttributes(lastStatementXml, "EquitySummaryByReportDateInBase");
+      if (equitySummary.length > 0) {
+        const latest = equitySummary[equitySummary.length - 1];
+        const nlv = parseNum(latest.totalLong) + parseNum(latest.totalShort);
+        const cash = parseNum(latest.cash);
+        const summaryDate = latest.reportDate ? formatDate(latest.reportDate) : new Date().toISOString().split("T")[0];
+
+        if (nlv > 0) {
+          await supabase.from("daily_account_summary").upsert(
+            { user_id: user.id, date: summaryDate, net_liquidation: nlv, cash_balance: cash },
+            { onConflict: "user_id,date" }
+          );
+        }
+      }
+
+      // ─── STEP 5: DIVIDENDS ───
+      const cashTxns = extractAttributes(xml, "CashTransaction");
+      for (const ct of cashTxns) {
+        const ctType = (ct.type || "").toLowerCase();
+        if (!ctType.includes("dividend") && !ctType.includes("payment in lieu")) continue;
+        recordsProcessed++;
+        if (!ct.symbol || !ct.dateTime) continue;
+
+        const { data: sec } = await supabase
+          .from("securities").select("id").eq("ticker", ct.symbol).maybeSingle();
+        if (!sec) continue;
+
+        const portfolioId = await getOrCreatePortfolio(supabase, user.id, conn.id, ct.accountId || null, (ct.currency as any) || "USD");
+        const amount = parseNum(ct.amount);
+        const tax = parseNum(ct.tax);
+        const fxRate = parseNum(ct.fxRateToBase) || 1;
+        const isRoc = ctType.includes("return of capital");
+        const exDate = formatDate(ct.reportDate || ct.dateTime);
+
+        const { data: existingDiv } = await supabase
+          .from("dividend_history").select("id")
+          .eq("security_id", sec.id).eq("portfolio_id", portfolioId).eq("ex_date", exDate).maybeSingle();
+        if (existingDiv) { recordsUpdated++; continue; }
+
+        const totalAmount = Math.abs(amount);
+        const withholdingTax = Math.abs(tax);
+
+        await supabase.from("dividend_history").insert({
+          portfolio_id: portfolioId, security_id: sec.id, ex_date: exDate,
+          total_amount: totalAmount, withholding_tax: withholdingTax,
+          net_amount: totalAmount - withholdingTax, amount_per_share: 0,
+          currency: (ct.currency as any) || "USD", fx_rate_to_base: fxRate,
+          is_roc: isRoc, sync_source: "FLEX_QUERY",
+        });
+        recordsCreated++;
+      }
+
+      console.log(`Dividends done. Total created: ${recordsCreated}`);
+
+      // ─── STEP 6: TRADES (batch-check existing) ───
+      const trades = extractAttributes(xml, "Trade");
+      // Pre-fetch existing trade IDs to avoid N+1 queries
+      const ibkrTradeIds = trades.map(t => t.tradeID).filter(Boolean);
+      const existingTradeIds = new Set<string>();
+      if (ibkrTradeIds.length > 0) {
+        // Fetch in batches of 500
+        for (let i = 0; i < ibkrTradeIds.length; i += 500) {
+          const batch = ibkrTradeIds.slice(i, i + 500);
+          const { data: existing } = await supabase
+            .from("transactions").select("ibkr_trade_id")
+            .in("ibkr_trade_id", batch);
+          if (existing) existing.forEach((e: any) => existingTradeIds.add(e.ibkr_trade_id));
+        }
+      }
+      console.log(`Pre-fetched ${existingTradeIds.size} existing trade IDs`);
+
+      for (const t of trades) {
+        recordsProcessed++;
+        if (!t.symbol || !t.tradeDate) continue;
+        if (t.tradeID && existingTradeIds.has(t.tradeID)) { recordsUpdated++; continue; }
+
+        const assetClass = mapAssetClass(t.assetCategory, t.description, t.symbol);
+        const sectorInfo = mapSectorIndustry(t.symbol, assetClass);
+        const { data: sec } = await supabase
+          .from("securities").upsert({
+            ticker: t.symbol, name: t.description || null, conid: t.conid || null,
+            exchange: t.listingExchange || t.exchange || null,
+            currency: (t.currency as any) || "USD", asset_class: assetClass,
+            isin: t.isin || null,
+            ...(sectorInfo ? { sector: sectorInfo.sector, industry: sectorInfo.industry } : {}),
+          }, { onConflict: "ticker,exchange" })
+          .select("id").single();
+
+        if (!sec) continue;
+
+        const portfolioId = await getOrCreatePortfolio(supabase, user.id, conn.id, t.accountId || null, (t.currency as any) || "USD");
+        const qty = parseNum(t.quantity);
+        const price = parseNum(t.tradePrice || t.price);
+        const commission = parseNum(t.ibCommission || t.commission);
+        const grossAmount = parseNum(t.proceeds || String(qty * price));
+        const netAmount = grossAmount + commission;
+        const fxRate = parseNum(t.fxRateToBase) || 1;
+        const txType = qty > 0 ? "BUY" : "SELL";
+
+        const { error: txErr } = await supabase.from("transactions").insert({
+          portfolio_id: portfolioId, security_id: sec.id,
+          transaction_type: txType, trade_date: formatDate(t.tradeDate),
+          settlement_date: t.settleDateTarget ? formatDate(t.settleDateTarget) : null,
+          quantity: Math.abs(qty), price: Math.abs(price),
+          commission: Math.abs(commission), gross_amount: Math.abs(grossAmount),
+          net_amount: Math.abs(netAmount), currency: (t.currency as any) || "USD",
+          fx_rate_to_base: fxRate, ibkr_trade_id: t.tradeID || null,
+          sync_source: "FLEX_QUERY",
+        });
+        if (!txErr) recordsCreated++;
+      }
+
+      // Step 7: If no open positions were found, recalculate from transactions
       if (openPositions.length === 0) {
         await recalculatePositions(supabase, user.id);
       }
