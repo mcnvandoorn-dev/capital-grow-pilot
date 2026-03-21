@@ -484,6 +484,11 @@ serve(async (req) => {
         await recalculatePositions(supabase, user.id);
       }
 
+      // Step 8: Backfill cost basis from transactions for positions that have 0 cost
+      if (openPositions.length > 0) {
+        await backfillCostBasisFromTransactions(supabase, user.id);
+      }
+
       // Update sync log as success
       if (syncLog) {
         await supabase
@@ -723,6 +728,80 @@ async function getOrCreatePortfolio(
 }
 
 async function recalculatePositions(supabase: any, userId: string) {
+async function backfillCostBasisFromTransactions(supabase: any, userId: string) {
+  // Find positions with 0 cost basis
+  const { data: portfolios } = await supabase
+    .from("portfolios")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("is_active", true);
+
+  if (!portfolios || portfolios.length === 0) return;
+
+  const portfolioIds = portfolios.map((p: any) => p.id);
+
+  const { data: zeroCostPositions } = await supabase
+    .from("positions")
+    .select("id, portfolio_id, security_id, quantity")
+    .in("portfolio_id", portfolioIds)
+    .eq("total_cost_basis", 0)
+    .gt("quantity", 0);
+
+  if (!zeroCostPositions || zeroCostPositions.length === 0) {
+    console.log("No zero-cost positions to backfill");
+    return;
+  }
+
+  console.log(`Backfilling cost basis for ${zeroCostPositions.length} positions from transactions`);
+
+  for (const pos of zeroCostPositions) {
+    const { data: txns } = await supabase
+      .from("transactions")
+      .select("transaction_type, quantity, price, commission")
+      .eq("portfolio_id", pos.portfolio_id)
+      .eq("security_id", pos.security_id)
+      .in("transaction_type", ["BUY", "SELL"])
+      .order("trade_date", { ascending: true });
+
+    if (!txns || txns.length === 0) continue;
+
+    // Reconstruct cost basis using average cost method
+    let qty = 0;
+    let totalCost = 0;
+
+    for (const tx of txns) {
+      if (tx.transaction_type === "BUY") {
+        qty += tx.quantity;
+        totalCost += tx.quantity * tx.price + Math.abs(tx.commission || 0);
+      } else {
+        const avgCostPerUnit = qty > 0 ? totalCost / qty : 0;
+        qty = Math.max(0, qty - tx.quantity);
+        totalCost = qty * avgCostPerUnit;
+      }
+    }
+
+    if (qty <= 0 || totalCost <= 0) continue;
+
+    // Only update if reconstructed qty roughly matches actual position
+    const qtyDiff = Math.abs(qty - pos.quantity);
+    const tolerance = Math.max(0.01, pos.quantity * 0.02); // 2% tolerance for DRIP fractional shares
+
+    if (qtyDiff <= tolerance) {
+      const avgCost = Math.round((totalCost / qty) * 10000) / 10000;
+      const roundedTotal = Math.round(totalCost * 100) / 100;
+
+      await supabase
+        .from("positions")
+        .update({ avg_cost_basis: avgCost, total_cost_basis: roundedTotal })
+        .eq("id", pos.id);
+
+      console.log(`Backfilled ${pos.security_id}: avgCost=${avgCost}, total=${roundedTotal} (txQty=${qty.toFixed(2)}, posQty=${pos.quantity})`);
+    } else {
+      console.log(`Skipped ${pos.security_id}: txQty=${qty.toFixed(2)} vs posQty=${pos.quantity} (diff=${qtyDiff.toFixed(2)} > tol=${tolerance.toFixed(2)})`);
+    }
+  }
+}
+
   // Get all portfolios for user
   const { data: portfolios } = await supabase
     .from("portfolios")
