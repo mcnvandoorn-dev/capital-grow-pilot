@@ -144,7 +144,7 @@ export function usePortfolioBreakdown(
     for (const inv of privateInvestments ?? []) {
       const equity = getPrivateEquity(inv);
       if (equity <= 0) continue;
-      const geoLabel = inv.geography_label ?? "Nederland";
+      const geoLabel = (inv.geography_label ?? "Nederland").trim();
       result.push({
         value: equity,
         keys: {
