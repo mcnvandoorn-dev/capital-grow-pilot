@@ -296,19 +296,28 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
 
         <div className="grid gap-4 py-2">
           {/* Portfolio */}
-          {(portfolios?.length ?? 0) > 1 && (
-            <div className="grid gap-1.5">
-              <Label>Portfolio</Label>
-              <Select value={effectivePortfolioId} onValueChange={setPortfolioId}>
-                <SelectTrigger><SelectValue placeholder="Kies portfolio" /></SelectTrigger>
-                <SelectContent>
-                  {portfolios?.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div className="grid gap-1.5">
+            <Label>Portfolio</Label>
+            <Select
+              value={creatingNewPortfolio ? "__new__" : effectivePortfolioId}
+              onValueChange={handlePortfolioChange}
+            >
+              <SelectTrigger><SelectValue placeholder="Kies portfolio" /></SelectTrigger>
+              <SelectContent>
+                {portfolios?.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+                <SelectItem value="__new__">+ Nieuw portfolio aanmaken</SelectItem>
+              </SelectContent>
+            </Select>
+            {creatingNewPortfolio && (
+              <Input
+                placeholder="Naam voor nieuw portfolio"
+                value={newPortfolioName}
+                onChange={(e) => setNewPortfolioName(e.target.value)}
+              />
+            )}
+          </div>
 
           {/* Type */}
           <div className="grid gap-1.5">
