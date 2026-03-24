@@ -50,8 +50,6 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
   const [price, setPrice] = useState("");
   const [tradeDate, setTradeDate] = useState(new Date().toISOString().split("T")[0]);
   const [portfolioId, setPortfolioId] = useState("");
-  const [newPortfolioName, setNewPortfolioName] = useState("");
-  const [creatingNewPortfolio, setCreatingNewPortfolio] = useState(false);
 
   // Fetch portfolios
   const { data: portfolios } = useQuery({
@@ -103,19 +101,10 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
     setPrice("");
     setTradeDate(new Date().toISOString().split("T")[0]);
     setPortfolioId("");
-    setNewPortfolioName("");
-    setCreatingNewPortfolio(false);
   };
 
-  const handlePortfolioChange = (value: string) => {
-    if (value === "__new__") {
-      setCreatingNewPortfolio(true);
-      setPortfolioId("");
-    } else {
-      setCreatingNewPortfolio(false);
-      setPortfolioId(value);
-    }
-  };
+
+
 
   const handleSave = async () => {
     if (!user) {
@@ -125,35 +114,8 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
 
     let activePortfolioId = effectivePortfolioId;
 
-    // Create new portfolio if user chose that option
-    if (creatingNewPortfolio) {
-      const name = newPortfolioName.trim();
-      if (!name) {
-        toast.error("Vul een naam in voor het nieuwe portfolio");
-        return;
-      }
-      try {
-        const { data: newPortfolio, error: portfolioErr } = await supabase
-          .from("portfolios")
-          .insert({
-            user_id: user.id,
-            name,
-            base_currency: "EUR",
-            strategy: "BUY_AND_HOLD",
-          })
-          .select("id")
-          .single();
-        if (portfolioErr) throw portfolioErr;
-        activePortfolioId = newPortfolio.id;
-        queryClient.invalidateQueries({ queryKey: ["portfolios"] });
-        toast.success(`Portfolio "${name}" aangemaakt`);
-      } catch (err: any) {
-        console.error("Create portfolio error:", err);
-        toast.error("Kon geen portfolio aanmaken. Probeer het opnieuw.");
-        return;
-      }
-    } else if (!activePortfolioId) {
-      // Fallback: auto-create default if somehow no portfolio exists and not creating new
+    // Auto-create default portfolio if none exists
+    if (!activePortfolioId) {
       try {
         const { data: newPortfolio, error: portfolioErr } = await supabase
           .from("portfolios")
@@ -296,28 +258,22 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
 
         <div className="grid gap-4 py-2">
           {/* Portfolio */}
-          <div className="grid gap-1.5">
-            <Label>Portfolio</Label>
-            <Select
-              value={creatingNewPortfolio ? "__new__" : effectivePortfolioId}
-              onValueChange={handlePortfolioChange}
-            >
-              <SelectTrigger><SelectValue placeholder="Kies portfolio" /></SelectTrigger>
-              <SelectContent>
-                {portfolios?.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-                <SelectItem value="__new__">+ Nieuw portfolio aanmaken</SelectItem>
-              </SelectContent>
-            </Select>
-            {creatingNewPortfolio && (
-              <Input
-                placeholder="Naam voor nieuw portfolio"
-                value={newPortfolioName}
-                onChange={(e) => setNewPortfolioName(e.target.value)}
-              />
-            )}
-          </div>
+          {(portfolios?.length ?? 0) > 0 && (
+            <div className="grid gap-1.5">
+              <Label>Portfolio</Label>
+              <Select
+                value={effectivePortfolioId}
+                onValueChange={setPortfolioId}
+              >
+                <SelectTrigger><SelectValue placeholder="Kies portfolio" /></SelectTrigger>
+                <SelectContent>
+                  {portfolios?.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Type */}
           <div className="grid gap-1.5">
