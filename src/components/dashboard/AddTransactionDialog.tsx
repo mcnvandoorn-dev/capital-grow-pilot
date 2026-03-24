@@ -57,7 +57,7 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("portfolios")
-        .select("id, name")
+        .select("id, name, strategy")
         .eq("is_active", true);
       if (error) throw error;
       return data;
