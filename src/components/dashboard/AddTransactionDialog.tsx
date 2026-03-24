@@ -267,15 +267,17 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
           {/* Portfolio */}
           {(portfolios?.length ?? 0) > 0 && (
             <div className="grid gap-1.5">
-              <Label>Portfolio</Label>
+              <Label>Strategie</Label>
               <Select
                 value={effectivePortfolioId}
                 onValueChange={setPortfolioId}
               >
-                <SelectTrigger><SelectValue placeholder="Kies portfolio" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Kies strategie" /></SelectTrigger>
                 <SelectContent>
                   {portfolios?.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    <SelectItem key={p.id} value={p.id}>
+                      {STRATEGY_LABELS[p.strategy as InvestorStrategy] ?? p.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
