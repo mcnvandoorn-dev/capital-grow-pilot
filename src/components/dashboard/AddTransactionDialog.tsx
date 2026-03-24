@@ -104,7 +104,14 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
   };
 
   const handleSave = async () => {
-    if (!user || !effectivePortfolioId) return;
+    if (!user) {
+      toast.error("Je moet ingelogd zijn om transacties op te slaan");
+      return;
+    }
+    if (!effectivePortfolioId) {
+      toast.error("Geen portfolio gevonden. Maak eerst een portfolio aan of synchroniseer je broker.");
+      return;
+    }
 
     const qty = parseFloat(quantity);
     const prc = parseFloat(price);
