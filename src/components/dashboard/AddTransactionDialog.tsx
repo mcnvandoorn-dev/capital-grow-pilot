@@ -26,6 +26,13 @@ import type { Database } from "@/integrations/supabase/types";
 type AssetClass = Database["public"]["Enums"]["asset_class"];
 type CurrencyCode = Database["public"]["Enums"]["currency_code"];
 type TransactionType = Database["public"]["Enums"]["transaction_type"];
+type InvestorStrategy = Database["public"]["Enums"]["investor_strategy"];
+
+const STRATEGY_LABELS: Record<InvestorStrategy, string> = {
+  BUY_AND_HOLD: "Buy & Hold",
+  DIVIDEND_GROWTH: "Dividend Growth",
+  WORKING_CAPITAL_GROWTH: "Working Capital Growth",
+};
 
 const ASSET_CLASSES: AssetClass[] = ["CEF", "BDC", "REIT", "ETF", "PREFERRED", "BABY_BOND", "OTHER"];
 const CURRENCIES: CurrencyCode[] = ["USD", "EUR", "CAD", "GBP", "CHF", "AUD"];
