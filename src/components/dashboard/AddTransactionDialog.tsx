@@ -208,7 +208,7 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
           .eq("id", existingPos.id);
       } else if (txType === "BUY") {
         await supabase.from("positions").insert({
-          portfolio_id: effectivePortfolioId,
+          portfolio_id: activePortfolioId,
           security_id: securityId,
           quantity: qty,
           avg_cost_basis: prc,
