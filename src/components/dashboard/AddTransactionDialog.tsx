@@ -103,6 +103,18 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
     setPrice("");
     setTradeDate(new Date().toISOString().split("T")[0]);
     setPortfolioId("");
+    setNewPortfolioName("");
+    setCreatingNewPortfolio(false);
+  };
+
+  const handlePortfolioChange = (value: string) => {
+    if (value === "__new__") {
+      setCreatingNewPortfolio(true);
+      setPortfolioId("");
+    } else {
+      setCreatingNewPortfolio(false);
+      setPortfolioId(value);
+    }
   };
 
   const handleSave = async () => {
