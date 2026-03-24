@@ -108,9 +108,31 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
       toast.error("Je moet ingelogd zijn om transacties op te slaan");
       return;
     }
-    if (!effectivePortfolioId) {
-      toast.error("Geen portfolio gevonden. Maak eerst een portfolio aan of synchroniseer je broker.");
-      return;
+
+    let activePortfolioId = effectivePortfolioId;
+
+    // Auto-create a default portfolio if none exists
+    if (!activePortfolioId) {
+      try {
+        const { data: newPortfolio, error: portfolioErr } = await supabase
+          .from("portfolios")
+          .insert({
+            user_id: user.id,
+            name: "Mijn Portfolio",
+            base_currency: "EUR",
+            strategy: "BUY_AND_HOLD",
+          })
+          .select("id")
+          .single();
+        if (portfolioErr) throw portfolioErr;
+        activePortfolioId = newPortfolio.id;
+        queryClient.invalidateQueries({ queryKey: ["portfolios"] });
+        toast.success("Standaard portfolio aangemaakt");
+      } catch (err: any) {
+        console.error("Auto-create portfolio error:", err);
+        toast.error("Kon geen portfolio aanmaken. Probeer het opnieuw.");
+        return;
+      }
     }
 
     const qty = parseFloat(quantity);
@@ -145,7 +167,7 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
 
       // 2. Insert transaction
       const { error: txErr } = await supabase.from("transactions").insert({
-        portfolio_id: effectivePortfolioId,
+        portfolio_id: activePortfolioId,
         security_id: securityId,
         transaction_type: txType as TransactionType,
         trade_date: tradeDate,
@@ -162,7 +184,7 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
       const { data: existingPos } = await supabase
         .from("positions")
         .select("id, quantity, total_cost_basis, avg_cost_basis")
-        .eq("portfolio_id", effectivePortfolioId)
+        .eq("portfolio_id", activePortfolioId)
         .eq("security_id", securityId)
         .maybeSingle();
 
@@ -186,7 +208,7 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
           .eq("id", existingPos.id);
       } else if (txType === "BUY") {
         await supabase.from("positions").insert({
-          portfolio_id: effectivePortfolioId,
+          portfolio_id: activePortfolioId,
           security_id: securityId,
           quantity: qty,
           avg_cost_basis: prc,
