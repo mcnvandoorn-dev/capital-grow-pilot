@@ -114,35 +114,8 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
 
     let activePortfolioId = effectivePortfolioId;
 
-    // Create new portfolio if user chose that option
-    if (creatingNewPortfolio) {
-      const name = newPortfolioName.trim();
-      if (!name) {
-        toast.error("Vul een naam in voor het nieuwe portfolio");
-        return;
-      }
-      try {
-        const { data: newPortfolio, error: portfolioErr } = await supabase
-          .from("portfolios")
-          .insert({
-            user_id: user.id,
-            name,
-            base_currency: "EUR",
-            strategy: "BUY_AND_HOLD",
-          })
-          .select("id")
-          .single();
-        if (portfolioErr) throw portfolioErr;
-        activePortfolioId = newPortfolio.id;
-        queryClient.invalidateQueries({ queryKey: ["portfolios"] });
-        toast.success(`Portfolio "${name}" aangemaakt`);
-      } catch (err: any) {
-        console.error("Create portfolio error:", err);
-        toast.error("Kon geen portfolio aanmaken. Probeer het opnieuw.");
-        return;
-      }
-    } else if (!activePortfolioId) {
-      // Fallback: auto-create default if somehow no portfolio exists and not creating new
+    // Auto-create default portfolio if none exists
+    if (!activePortfolioId) {
       try {
         const { data: newPortfolio, error: portfolioErr } = await supabase
           .from("portfolios")
