@@ -26,6 +26,13 @@ import type { Database } from "@/integrations/supabase/types";
 type AssetClass = Database["public"]["Enums"]["asset_class"];
 type CurrencyCode = Database["public"]["Enums"]["currency_code"];
 type TransactionType = Database["public"]["Enums"]["transaction_type"];
+type InvestorStrategy = Database["public"]["Enums"]["investor_strategy"];
+
+const STRATEGY_LABELS: Record<InvestorStrategy, string> = {
+  BUY_AND_HOLD: "Buy & Hold",
+  DIVIDEND_GROWTH: "Dividend Growth",
+  WORKING_CAPITAL_GROWTH: "Working Capital Growth",
+};
 
 const ASSET_CLASSES: AssetClass[] = ["CEF", "BDC", "REIT", "ETF", "PREFERRED", "BABY_BOND", "OTHER"];
 const CURRENCIES: CurrencyCode[] = ["USD", "EUR", "CAD", "GBP", "CHF", "AUD"];
@@ -57,7 +64,7 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("portfolios")
-        .select("id, name")
+        .select("id, name, strategy")
         .eq("is_active", true);
       if (error) throw error;
       return data;
@@ -260,15 +267,17 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
           {/* Portfolio */}
           {(portfolios?.length ?? 0) > 0 && (
             <div className="grid gap-1.5">
-              <Label>Portfolio</Label>
+              <Label>Strategie</Label>
               <Select
                 value={effectivePortfolioId}
                 onValueChange={setPortfolioId}
               >
-                <SelectTrigger><SelectValue placeholder="Kies portfolio" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Kies strategie" /></SelectTrigger>
                 <SelectContent>
                   {portfolios?.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    <SelectItem key={p.id} value={p.id}>
+                      {STRATEGY_LABELS[p.strategy as InvestorStrategy] ?? p.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
