@@ -167,7 +167,7 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
 
       // 2. Insert transaction
       const { error: txErr } = await supabase.from("transactions").insert({
-        portfolio_id: effectivePortfolioId,
+        portfolio_id: activePortfolioId,
         security_id: securityId,
         transaction_type: txType as TransactionType,
         trade_date: tradeDate,
@@ -184,7 +184,7 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
       const { data: existingPos } = await supabase
         .from("positions")
         .select("id, quantity, total_cost_basis, avg_cost_basis")
-        .eq("portfolio_id", effectivePortfolioId)
+        .eq("portfolio_id", activePortfolioId)
         .eq("security_id", securityId)
         .maybeSingle();
 
