@@ -108,9 +108,31 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
       toast.error("Je moet ingelogd zijn om transacties op te slaan");
       return;
     }
-    if (!effectivePortfolioId) {
-      toast.error("Geen portfolio gevonden. Maak eerst een portfolio aan of synchroniseer je broker.");
-      return;
+
+    let activePortfolioId = effectivePortfolioId;
+
+    // Auto-create a default portfolio if none exists
+    if (!activePortfolioId) {
+      try {
+        const { data: newPortfolio, error: portfolioErr } = await supabase
+          .from("portfolios")
+          .insert({
+            user_id: user.id,
+            name: "Mijn Portfolio",
+            base_currency: "EUR",
+            strategy: "BUY_AND_HOLD",
+          })
+          .select("id")
+          .single();
+        if (portfolioErr) throw portfolioErr;
+        activePortfolioId = newPortfolio.id;
+        queryClient.invalidateQueries({ queryKey: ["portfolios"] });
+        toast.success("Standaard portfolio aangemaakt");
+      } catch (err: any) {
+        console.error("Auto-create portfolio error:", err);
+        toast.error("Kon geen portfolio aanmaken. Probeer het opnieuw.");
+        return;
+      }
     }
 
     const qty = parseFloat(quantity);
