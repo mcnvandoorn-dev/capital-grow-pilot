@@ -50,6 +50,8 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
   const [price, setPrice] = useState("");
   const [tradeDate, setTradeDate] = useState(new Date().toISOString().split("T")[0]);
   const [portfolioId, setPortfolioId] = useState("");
+  const [newPortfolioName, setNewPortfolioName] = useState("");
+  const [creatingNewPortfolio, setCreatingNewPortfolio] = useState(false);
 
   // Fetch portfolios
   const { data: portfolios } = useQuery({
