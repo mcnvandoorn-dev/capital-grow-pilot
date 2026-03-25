@@ -95,8 +95,8 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
     );
   }, [ticker, existingSecurities]);
 
-  // Auto-set first portfolio
-  const effectivePortfolioId = portfolioId || portfolios?.[0]?.id || "";
+  // Find existing portfolio for selected strategy
+  const matchedPortfolio = portfolios?.find((p) => p.strategy === selectedStrategy);
 
   const resetForm = () => {
     setTicker("");
@@ -107,7 +107,7 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
     setQuantity("");
     setPrice("");
     setTradeDate(new Date().toISOString().split("T")[0]);
-    setPortfolioId("");
+    setSelectedStrategy("BUY_AND_HOLD");
   };
 
 
@@ -119,18 +119,19 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
       return;
     }
 
-    let activePortfolioId = effectivePortfolioId;
+    let activePortfolioId = matchedPortfolio?.id;
 
-    // Auto-create default portfolio if none exists
+    // Auto-create portfolio for this strategy if it doesn't exist yet
     if (!activePortfolioId) {
       try {
+        const strategyLabel = ALL_STRATEGIES.find((s) => s.value === selectedStrategy)?.label ?? selectedStrategy;
         const { data: newPortfolio, error: portfolioErr } = await supabase
           .from("portfolios")
           .insert({
             user_id: user.id,
-            name: "Mijn Portfolio",
+            name: strategyLabel,
             base_currency: "EUR",
-            strategy: "BUY_AND_HOLD",
+            strategy: selectedStrategy,
           })
           .select("id")
           .single();
@@ -264,25 +265,23 @@ export function AddTransactionDialog({ children }: AddTransactionDialogProps) {
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
-          {/* Portfolio */}
-          {(portfolios?.length ?? 0) > 0 && (
-            <div className="grid gap-1.5">
-              <Label>Strategie</Label>
-              <Select
-                value={effectivePortfolioId}
-                onValueChange={setPortfolioId}
-              >
-                <SelectTrigger><SelectValue placeholder="Kies strategie" /></SelectTrigger>
-                <SelectContent>
-                  {portfolios?.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {STRATEGY_LABELS[p.strategy as InvestorStrategy] ?? p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {/* Strategy */}
+          <div className="grid gap-1.5">
+            <Label>Strategie</Label>
+            <Select
+              value={selectedStrategy}
+              onValueChange={(v) => setSelectedStrategy(v as InvestorStrategy)}
+            >
+              <SelectTrigger><SelectValue placeholder="Kies strategie" /></SelectTrigger>
+              <SelectContent>
+                {ALL_STRATEGIES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Type */}
           <div className="grid gap-1.5">
