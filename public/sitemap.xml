@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://capital-grow-pilot.lovable.app/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://capital-grow-pilot.lovable.app/watchlist</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://capital-grow-pilot.lovable.app/strategies</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://capital-grow-pilot.lovable.app/portfolio-breakdown</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://capital-grow-pilot.lovable.app/ticker-deep-dive</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://capital-grow-pilot.lovable.app/rebalancing-advisor</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://capital-grow-pilot.lovable.app/dividend-calendar</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://capital-grow-pilot.lovable.app/alerts</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://capital-grow-pilot.lovable.app/settings</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://capital-grow-pilot.lovable.app/auth</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+</urlset>
