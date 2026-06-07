@@ -1,0 +1,26 @@
+# InvestView
+
+> Professioneel beleggingsdashboard voor portfolio- en watchlistbeheer. Beheer beleggingsstrategieën (Buy & Hold, Dividend Growth, Working Capital Growth), volg posities, analyseer dividenden en herbalanceer je portfolio.
+
+## Belangrijkste functies
+
+- **Portfolio**: overzicht van holdings, performance en allocatie
+- **Watchlist**: volg tickers en marktdata
+- **Strategieën**: beheer beleggingsstrategieën en private investments
+- **Portfolio Breakdown**: look-through analyse van fondsen en ETF's
+- **Ticker Deep Dive**: fundamentele en kwalitatieve analyse per ticker
+- **Rebalancing Advisor**: aanbevelingen voor herbalancering
+- **Dividend Kalender**: overzicht van komende dividenduitkeringen
+- **Meldingen**: prijs- en portfolio-alerts
+
+## Pagina's
+
+- [Portfolio](https://capital-grow-pilot.lovable.app/): hoofd-dashboard
+- [Watchlist](https://capital-grow-pilot.lovable.app/watchlist)
+- [Strategieën](https://capital-grow-pilot.lovable.app/strategies)
+- [Portfolio Breakdown](https://capital-grow-pilot.lovable.app/portfolio-breakdown)
+- [Ticker Deep Dive](https://capital-grow-pilot.lovable.app/ticker-deep-dive)
+- [Rebalancing Advisor](https://capital-grow-pilot.lovable.app/rebalancing-advisor)
+- [Dividend Kalender](https://capital-grow-pilot.lovable.app/dividend-calendar)
+- [Meldingen](https://capital-grow-pilot.lovable.app/alerts)
+- [Instellingen](https://capital-grow-pilot.lovable.app/settings)
