@@ -19,6 +19,10 @@ import TickerDeepDive from "./pages/TickerDeepDive";
 import RebalancingAdvisor from "./pages/RebalancingAdvisor";
 import DividendCalendar from "./pages/DividendCalendar";
 import NotFound from "./pages/NotFound";
+import { CompassLayout } from "./components/dividend-compass/CompassLayout";
+import CompassHome from "./pages/compass/CompassHome";
+import DividendAristocrats from "./pages/compass/DividendAristocrats";
+
 
 const queryClient = new QueryClient();
 
@@ -39,6 +43,14 @@ const App = () => (
           <CurrencyProvider>
           <Routes>
             <Route path="/auth" element={withSeo("Inloggen", "Log in op InvestView om je beleggingsportfolio te beheren.", <Auth />)} />
+
+            {/* DividendCompass public content site */}
+            <Route element={<CompassLayout />}>
+              <Route path="/compass" element={withSeo("DividendCompass", "Clear, research-driven guides for long-term dividend investors.", <CompassHome />)} />
+              <Route path="/dividend-aristocrats" element={withSeo("Dividend Aristocrats Guide", "A guide to companies with decades of consistent dividend growth.", <DividendAristocrats />)} />
+            </Route>
+
+
             <Route path="/" element={<ProtectedRoute>{withSeo("Portfolio", "Overzicht van je beleggingsportfolio: holdings, performance en allocatie.", <Index />)}</ProtectedRoute>} />
             <Route path="/watchlist" element={<ProtectedRoute>{withSeo("Watchlist", "Volg tickers en marktdata in je persoonlijke watchlist.", <Watchlist />)}</ProtectedRoute>} />
             <Route path="/stock/:id" element={<ProtectedRoute>{withSeo("Aandeel detail", "Detailweergave van een aandeel met koers, fundamentals en dividenden.", <StockDetail />)}</ProtectedRoute>} />
