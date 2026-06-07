@@ -1,3 +1,5 @@
+import AristocratsTable from "@/components/dividend-compass/AristocratsTable";
+
 export default function DividendAristocrats() {
   const stats = [
     { value: "65", label: "Aristocrats", sub: "Current count" },
@@ -118,8 +120,7 @@ export default function DividendAristocrats() {
         </div>
       </section>
 
-      {/* Anchor for future table */}
-      <div id="aristocrats-table" />
+      <AristocratsTable />
     </>
   );
 }
