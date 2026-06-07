@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { CurrencyProvider } from "@/hooks/useDisplayCurrency";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { PageSeo } from "@/components/seo/PageSeo";
 import Index from "./pages/Index";
 import Watchlist from "./pages/Watchlist";
 import StockDetail from "./pages/StockDetail";
@@ -21,6 +22,13 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+const withSeo = (title: string, description: string, node: React.ReactNode) => (
+  <>
+    <PageSeo title={title} description={description} />
+    {node}
+  </>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -30,18 +38,18 @@ const App = () => (
         <AuthProvider>
           <CurrencyProvider>
           <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/watchlist" element={<ProtectedRoute><Watchlist /></ProtectedRoute>} />
-            <Route path="/stock/:id" element={<ProtectedRoute><StockDetail /></ProtectedRoute>} />
-            <Route path="/strategies" element={<ProtectedRoute><Strategies /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
-            <Route path="/portfolio-breakdown" element={<ProtectedRoute><PortfolioBreakdown /></ProtectedRoute>} />
-            <Route path="/ticker-deep-dive" element={<ProtectedRoute><TickerDeepDive /></ProtectedRoute>} />
-            <Route path="/rebalancing-advisor" element={<ProtectedRoute><RebalancingAdvisor /></ProtectedRoute>} />
-            <Route path="/dividend-calendar" element={<ProtectedRoute><DividendCalendar /></ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
+            <Route path="/auth" element={withSeo("Inloggen", "Log in op InvestView om je beleggingsportfolio te beheren.", <Auth />)} />
+            <Route path="/" element={<ProtectedRoute>{withSeo("Portfolio", "Overzicht van je beleggingsportfolio: holdings, performance en allocatie.", <Index />)}</ProtectedRoute>} />
+            <Route path="/watchlist" element={<ProtectedRoute>{withSeo("Watchlist", "Volg tickers en marktdata in je persoonlijke watchlist.", <Watchlist />)}</ProtectedRoute>} />
+            <Route path="/stock/:id" element={<ProtectedRoute>{withSeo("Aandeel detail", "Detailweergave van een aandeel met koers, fundamentals en dividenden.", <StockDetail />)}</ProtectedRoute>} />
+            <Route path="/strategies" element={<ProtectedRoute>{withSeo("Strategieën", "Beheer beleggingsstrategieën zoals Buy & Hold, Dividend Growth en Working Capital Growth.", <Strategies />)}</ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute>{withSeo("Instellingen", "Beheer je account, integraties en voorkeuren in InvestView.", <Settings />)}</ProtectedRoute>} />
+            <Route path="/alerts" element={<ProtectedRoute>{withSeo("Meldingen", "Beheer prijs- en portfolio-alerts voor je beleggingen.", <Alerts />)}</ProtectedRoute>} />
+            <Route path="/portfolio-breakdown" element={<ProtectedRoute>{withSeo("Portfolio Breakdown", "Look-through analyse van je portfolio, fondsen en ETF's per sector en regio.", <PortfolioBreakdown />)}</ProtectedRoute>} />
+            <Route path="/ticker-deep-dive" element={<ProtectedRoute>{withSeo("Ticker Deep Dive", "Diepgaande fundamentele en kwalitatieve analyse per ticker.", <TickerDeepDive />)}</ProtectedRoute>} />
+            <Route path="/rebalancing-advisor" element={<ProtectedRoute>{withSeo("Rebalancing Advisor", "Aanbevelingen voor het herbalanceren van je beleggingsportfolio.", <RebalancingAdvisor />)}</ProtectedRoute>} />
+            <Route path="/dividend-calendar" element={<ProtectedRoute>{withSeo("Dividend Kalender", "Overzicht van komende dividenduitkeringen van je posities.", <DividendCalendar />)}</ProtectedRoute>} />
+            <Route path="*" element={withSeo("Niet gevonden", "De gevraagde pagina bestaat niet.", <NotFound />)} />
           </Routes>
           </CurrencyProvider>
         </AuthProvider>
